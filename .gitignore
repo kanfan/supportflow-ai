@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Build and package output
+build/
+dist/
+*.egg-info/
+
+# Logs and local runtime data
+*.log
+*.sqlite3
+celerybeat-schedule*
+
+# Codex and local intermediate files
+.agents/
+.codex/
+tmp/
