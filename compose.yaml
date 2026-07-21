@@ -1,0 +1,78 @@
+name: supportflow
+
+x-app-environment: &app-environment
+  SUPPORTFLOW_DATABASE_URL: postgresql+psycopg://supportflow:supportflow@postgres:5432/supportflow
+  SUPPORTFLOW_REDIS_URL: redis://redis:6379/0
+  SUPPORTFLOW_CELERY_BROKER_URL: redis://redis:6379/0
+  SUPPORTFLOW_CELERY_RESULT_BACKEND_URL: redis://redis:6379/1
+
+x-app-depends-on: &app-depends-on
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.5-pg17-bookworm
+    environment:
+      POSTGRES_DB: supportflow
+      POSTGRES_USER: supportflow
+      POSTGRES_PASSWORD: supportflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supportflow -d supportflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "${SUPPORTFLOW_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8.4.4-alpine
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "${SUPPORTFLOW_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+
+  api:
+    build:
+      context: .
+    environment: *app-environment
+    depends_on: *app-depends-on
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "${SUPPORTFLOW_API_PORT:-8000}:8000"
+
+  worker:
+    build:
+      context: .
+    command: celery -A app.worker.celery_app worker --loglevel=INFO
+    environment: *app-environment
+    depends_on: *app-depends-on
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - celery -A app.worker.celery_app inspect ping -d "celery@$${HOSTNAME}"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:
+  redis-data:

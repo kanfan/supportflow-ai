@@ -20,6 +20,8 @@ class Settings(BaseSettings):
         "postgresql+psycopg://supportflow:supportflow@localhost:5432/supportflow"
     )
     redis_url: str = "redis://localhost:6379/0"
+    celery_broker_url: str = "redis://localhost:6379/0"
+    celery_result_backend_url: str = "redis://localhost:6379/1"
 
 
 @lru_cache
