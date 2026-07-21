@@ -9,6 +9,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "pre-commit>=4.3.0",
     "pyright>=1.1.411",
     "pytest>=9.1.1",
     "ruff>=0.15.22",
@@ -17,3 +18,11 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py313"
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+include = ["app", "tests"]
