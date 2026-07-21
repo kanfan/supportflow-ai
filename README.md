@@ -1,8 +1,10 @@
 # SupportFlow AI
 
+[![CI](https://github.com/kanfan/supportflow-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/kanfan/supportflow-ai/actions/workflows/ci.yml)
+
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status:** Planning and Week 1 setup. The product features described below are targets, not completed functionality.
+> **Project status:** Week 1 local walking skeleton is implemented and verified in CI. Authentication, tickets, document ingestion, and AI/RAG remain planned work.
 
 ## The problem
 
@@ -61,7 +63,7 @@ Redis queue ------> Celery worker
 - GitHub Actions
 - Render for the portfolio deployment
 
-Exact dependency versions will be recorded in `pyproject.toml` when the Week 1 application skeleton is created.
+Runtime and development dependencies are declared in `pyproject.toml` and resolved reproducibly through `uv.lock`.
 
 ## Current milestone: local walking skeleton
 
@@ -69,12 +71,12 @@ The first milestone is deliberately small. It proves that our development enviro
 
 ### Acceptance criteria
 
-- [ ] `docker compose up` starts the local services.
-- [ ] FastAPI exposes `GET /health/live`.
-- [ ] A sample Celery task is processed through Redis.
-- [ ] At least one automated test passes.
-- [ ] Linting and type checking run successfully.
-- [ ] Continuous integration runs on the main branch.
+- [x] `docker compose up` starts PostgreSQL/pgvector, Redis, the API, and the worker.
+- [x] FastAPI exposes `GET /health/live`.
+- [x] A sample Celery task is processed through Redis.
+- [x] Automated tests cover the API contract and worker foundation.
+- [x] Linting and type checking run successfully.
+- [x] Continuous integration runs on pull requests and the main branch.
 - [ ] A second contributor can follow this README on a clean machine.
 
 ## Initial ownership
@@ -116,13 +118,78 @@ These boundaries keep the project focused on its main learning and product goals
 
 ## Local development
 
-Local setup instructions will be added with the first application skeleton. The intended command will be:
+### Prerequisites
+
+- Git
+- Docker Desktop or Docker Engine with Compose v2
+- Optional for host-based development: Python 3.13 and [uv](https://docs.astral.sh/uv/getting-started/installation/)
+
+### Start the full stack
+
+Copy the example environment file once:
 
 ```powershell
-docker compose up --build
+Copy-Item .env.example .env
 ```
 
-Do not expect this command to work yet. This section will be updated as part of the current milestone.
+Build the application image and wait for all four services to become healthy:
+
+```powershell
+docker compose up --detach --build --wait
+```
+
+Available local endpoints and services:
+
+| Service | Address |
+| --- | --- |
+| API | <http://127.0.0.1:8000> |
+| OpenAPI UI | <http://127.0.0.1:8000/docs> |
+| Liveness | <http://127.0.0.1:8000/health/live> |
+| PostgreSQL/pgvector | `127.0.0.1:5432` |
+| Redis | `127.0.0.1:6379` |
+
+Verify that a task travels through Redis, runs on the worker, and returns its result:
+
+```powershell
+docker compose run --rm api python -m scripts.smoke_worker
+```
+
+Inspect logs or stop the stack:
+
+```powershell
+docker compose logs --follow api worker
+docker compose down
+```
+
+`docker compose down --volumes` also deletes local PostgreSQL and Redis data. Use it only when a clean reset is intended.
+
+### Run the API and worker on the host
+
+Keep PostgreSQL and Redis in Docker, install the locked Python environment, and start each process in a separate terminal:
+
+```powershell
+docker compose up --detach postgres redis
+uv sync --locked --all-groups
+uv run fastapi dev app/main.py
+uv run celery -A app.worker.celery_app worker --loglevel=INFO
+```
+
+Settings use the `SUPPORTFLOW_` prefix and are documented in `.env.example`.
+
+### Quality checks
+
+Run the same checks as CI before opening a pull request:
+
+```powershell
+uv lock --check
+uv run ruff check .
+uv run ruff format --check .
+uv run pyright
+uv run pytest
+uv run pre-commit run --all-files
+```
+
+Install the Git hook once with `uv run pre-commit install`. GitHub Actions repeats these checks and also builds the containers, waits for every service health check, calls the API, and performs the Celery queue round trip.
 
 ## Working agreement
 
@@ -138,6 +205,9 @@ Do not expect this command to work yet. This section will be updated as part of 
 ## Documentation
 
 The complete project plan is available in [SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf](./SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf).
+
+- [API conventions](./docs/api-conventions.md)
+- [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
 
 The plan is a roadmap, not an implementation claim. This README will evolve as working features, tests, measurements, and known limitations are added.
 
