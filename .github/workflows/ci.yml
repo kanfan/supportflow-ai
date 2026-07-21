@@ -71,7 +71,7 @@ jobs:
         run: curl --fail --show-error http://127.0.0.1:8000/health/live
 
       - name: Check worker queue round trip
-        run: docker compose run --rm api python scripts/smoke_worker.py
+        run: docker compose run --rm api python -m scripts.smoke_worker
 
       - name: Show service logs on failure
         if: failure()
