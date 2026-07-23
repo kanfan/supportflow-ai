@@ -14,6 +14,8 @@ COPY --from=uv /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
+COPY alembic.ini ./
+COPY alembic ./alembic
 COPY app ./app
 COPY scripts ./scripts
 
