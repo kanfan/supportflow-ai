@@ -136,6 +136,7 @@ Build the application image and wait for all four services to become healthy:
 
 ```powershell
 docker compose up --detach --build --wait
+docker compose run --rm api alembic upgrade head
 ```
 
 Available local endpoints and services:
@@ -175,6 +176,47 @@ uv run celery -A app.worker.celery_app worker --loglevel=INFO
 ```
 
 Settings use the `SUPPORTFLOW_` prefix and are documented in `.env.example`.
+
+### Authentication flow
+
+Registration creates the first user, organization, and `admin` membership in one
+database transaction. Passwords are stored only as Argon2id hashes. Access tokens
+identify the user for 15 minutes; organization access and role are always reloaded
+from PostgreSQL.
+
+Register and log in from PowerShell:
+
+```powershell
+$registration = @{
+  email = "admin@example.com"
+  password = "correct horse battery staple"
+  organization_name = "Example Company"
+  organization_slug = "example-company"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/api/v1/auth/register `
+  -ContentType "application/json" `
+  -Body $registration
+
+$login = @{
+  email = "admin@example.com"
+  password = "correct horse battery staple"
+} | ConvertTo-Json
+
+$token = Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/api/v1/auth/login `
+  -ContentType "application/json" `
+  -Body $login
+
+Invoke-RestMethod -Method Get `
+  -Uri http://127.0.0.1:8000/api/v1/auth/me `
+  -Headers @{ Authorization = "Bearer $($token.access_token)" }
+```
+
+Tenant-owned endpoints additionally require `X-Organization-ID`. The API verifies
+that header against the authenticated user's active membership; it never trusts an
+organization or role supplied inside a token.
 
 ### Database migrations
 

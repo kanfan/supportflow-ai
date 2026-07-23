@@ -5,6 +5,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 import pytest
+from sqlalchemy import text
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session
 
@@ -48,6 +49,21 @@ def database_engine(migrated_database_url: str) -> Iterator[Engine]:
     engine = build_engine(migrated_database_url)
     yield engine
     engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def clean_identity_tables(database_engine: Engine) -> Iterator[None]:
+    def truncate() -> None:
+        with database_engine.begin() as connection:
+            connection.execute(
+                text(
+                    "TRUNCATE TABLE organization_members, users, organizations CASCADE"
+                )
+            )
+
+    truncate()
+    yield
+    truncate()
 
 
 @pytest.fixture
