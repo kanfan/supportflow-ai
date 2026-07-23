@@ -4,7 +4,7 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status:** Week 1 local walking skeleton is implemented and verified in CI. Authentication, tickets, document ingestion, and AI/RAG remain planned work.
+> **Project status:** Week 1 local walking skeleton is implemented and verified in CI. Week 2 database and identity foundations are in progress. Authentication endpoints, tickets, document ingestion, and AI/RAG remain planned work.
 
 ## The problem
 
@@ -175,6 +175,44 @@ uv run celery -A app.worker.celery_app worker --loglevel=INFO
 ```
 
 Settings use the `SUPPORTFLOW_` prefix and are documented in `.env.example`.
+
+### Database migrations
+
+Alembic migrations are the version history for the PostgreSQL schema. Apply every
+pending migration before running code that depends on new tables:
+
+```powershell
+uv run alembic upgrade head
+uv run alembic check
+```
+
+`alembic check` detects model changes for which a migration has not been written.
+To test a complete migration round trip on a disposable database:
+
+```powershell
+uv run alembic downgrade base
+uv run alembic upgrade head
+```
+
+The downgrade command removes the migrated tables and their data. Never run it
+against a database whose data you need to keep.
+
+### PostgreSQL integration tests
+
+The normal test command skips database integration tests unless an explicit,
+disposable database named `supportflow_test` is configured. With the Compose
+PostgreSQL service running, create it once:
+
+```powershell
+docker compose up --detach postgres
+docker compose exec postgres createdb --username supportflow supportflow_test
+$env:SUPPORTFLOW_TEST_DATABASE_URL = "postgresql+psycopg://supportflow:supportflow@127.0.0.1:5432/supportflow_test"
+uv run pytest -m integration
+```
+
+If `createdb` reports that the database already exists, continue with the next
+command. The integration suite verifies upgrade/check/downgrade/upgrade and leaves
+the disposable schema at Alembic `base` when it finishes.
 
 ### Quality checks
 
