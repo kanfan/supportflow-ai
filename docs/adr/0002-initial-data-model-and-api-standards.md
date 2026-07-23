@@ -24,7 +24,7 @@ erDiagram
     USER ||--o{ ORGANIZATION_MEMBER : joins
     ORGANIZATION ||--o{ CUSTOMER : owns
     ORGANIZATION ||--o{ TICKET : owns
-    CUSTOMER ||--o{ TICKET : requests
+    CUSTOMER o|--o{ TICKET : requests
     TICKET ||--|{ TICKET_MESSAGE : contains
     ORGANIZATION ||--o{ KNOWLEDGE_DOCUMENT : owns
 ```
@@ -34,20 +34,47 @@ tickets, ticket messages, and knowledge documents are tenant-owned records. A
 customer represents the requester described in the project plan. A ticket may omit
 `customer_id` when its requester is anonymous or has not yet been normalized.
 
+Every ticket is created with at least one message. `POST /api/v1/tickets` requires
+an `initial_message`, and the application service creates the ticket and its first
+message in one database transaction. If either write fails, neither record is
+committed. This invariant is enforced by the application service because a normal
+foreign key cannot require a parent row to have at least one child row.
+
 ### Initial entity sketch
 
 | Entity | Initial fields |
 | --- | --- |
 | `organizations` | `id`, `name`, `slug`, `status`, `created_at`, `updated_at` |
 | `users` | `id`, `email`, `password_hash`, `status`, `created_at`, `updated_at` |
-| `organization_members` | `organization_id`, `user_id`, `role`, `status`, `created_at` |
+| `organization_members` | `organization_id`, `user_id`, `role`, `status`, `created_at`, `updated_at` |
 | `customers` | `id`, `organization_id`, `name`, `email`, `external_id`, `created_at`, `updated_at` |
 | `tickets` | `id`, `organization_id`, `customer_id`, `source_type`, `external_id`, `subject`, `status`, `created_at`, `updated_at` |
-| `ticket_messages` | `id`, `organization_id`, `ticket_id`, `author_type`, `body`, `created_at` |
+| `ticket_messages` | `id`, `organization_id`, `ticket_id`, `author_type`, `author_user_id`, `author_customer_id`, `body`, `created_at` |
 | `knowledge_documents` | `id`, `organization_id`, `source_type`, `external_id`, `filename`, `status`, `storage_key`, `created_at`, `updated_at` |
 
 The sketch defines the shared vocabulary and relationships. Individual feature ADRs
 or migrations may add fields when their behavior and validation rules are known.
+
+### Message author identity
+
+`author_type` describes the kind of actor, while real foreign keys identify the
+actor whenever the message was written by a person:
+
+| `author_type` | `author_user_id` | `author_customer_id` |
+| --- | --- | --- |
+| `customer` | null | required |
+| `agent` | required | null |
+| `system` | null | null |
+
+- A database check constraint enforces these three valid combinations.
+- `(organization_id, author_customer_id)` references a customer in the same
+  organization. A customer-authored message must use the ticket's customer.
+- `(organization_id, author_user_id)` references an organization membership. The
+  application service also verifies that the membership is active.
+- For an agent-authored message, the authenticated user determines
+  `author_user_id`; the client cannot claim another user as the author.
+- A single polymorphic `author_id` is not used because the database could not enforce
+  whether it references a user or a customer.
 
 ### Identifiers and uniqueness
 
@@ -107,6 +134,33 @@ data-deletion and KVKK requirements before real customer data is accepted.
 - PostgreSQL row-level security is not part of the initial implementation. Explicit
   repository filtering, database constraints, and cross-tenant integration tests
   are the first enforcement layers.
+
+### Week 2 closed values and ticket transitions
+
+Week 2 uses the following lowercase values:
+
+| Field | Allowed values |
+| --- | --- |
+| Organization status | `active`, `suspended` |
+| User status | `active`, `disabled` |
+| Membership role | `admin`, `agent` |
+| Membership status | `active`, `inactive` |
+| Ticket status | `open`, `processing`, `waiting_for_agent`, `resolved`, `closed` |
+| Ticket source type | `manual`, `api` |
+| Message author type | `customer`, `agent`, `system` |
+
+A newly created ticket starts as `open`. The minimum allowed transitions are:
+
+| Current status | Next status |
+| --- | --- |
+| `open` | `processing` |
+| `processing` | `waiting_for_agent` |
+| `waiting_for_agent` | `resolved` |
+| `resolved` | `closed` |
+
+Week 2 does not allow skipped or reverse transitions. Invalid transitions return
+`409 Conflict`. Reopening or adding transitions requires an explicit later product
+decision, with the corresponding service tests and database constraint migration.
 
 ### Naming and status values
 
@@ -174,6 +228,10 @@ make offset pagination unreliable.
   tests instead of existing only in API dependencies.
 - Storing `organization_id` on child tables adds some redundancy, but enables direct
   tenant filtering and organization-aware foreign keys.
+- Ticket creation is a multi-record transaction so callers never observe an empty
+  ticket.
+- Message author columns add nullable fields, but preserve foreign-key integrity and
+  auditability without a polymorphic identifier.
 - Offset pagination is simpler to learn and implement, but may need replacement when
   datasets or write rates grow.
 - Deferring generic deletion avoids claiming privacy guarantees before retention and
@@ -186,6 +244,12 @@ make offset pagination unreliable.
 - Tenant A cannot read or mutate Tenant B customers, tickets, messages, or documents.
 - Invalid cross-tenant relationships fail either repository validation or database
   constraints.
+- Ticket creation rolls back both the ticket and initial message when either write
+  fails.
+- Message author check constraints reject missing, conflicting, and cross-tenant
+  identities.
+- Ticket transition tests cover every allowed edge and representative rejected
+  transitions.
 - OpenAPI examples and error responses follow these conventions.
 
 ## Follow-up
