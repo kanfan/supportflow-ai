@@ -1,4 +1,4 @@
-from fastapi import Query
+from fastapi import HTTPException, Query
 from fastapi.testclient import TestClient
 
 from app.config import Settings
@@ -53,3 +53,21 @@ def test_validation_failure_does_not_echo_plaintext_password() -> None:
 
     assert response.status_code == 422
     assert '"short"' not in response.text
+
+
+def test_http_exception_headers_are_preserved() -> None:
+    application = create_app(Settings(environment="test"))
+
+    @application.get("/authentication-required")
+    async def authentication_required() -> None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    client = TestClient(application)
+    response = client.get("/authentication-required")
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"

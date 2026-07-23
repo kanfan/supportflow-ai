@@ -209,6 +209,23 @@ def test_login_failures_are_indistinguishable(auth_client: TestClient) -> None:
     assert wrong_password.status_code == 401
     assert unknown_email.status_code == 401
     assert wrong_password.json() == unknown_email.json()
+    assert wrong_password.headers["www-authenticate"] == "Bearer"
+    assert unknown_email.headers["www-authenticate"] == "Bearer"
+
+
+def test_missing_and_invalid_bearer_tokens_return_a_challenge(
+    auth_client: TestClient,
+) -> None:
+    missing_token = auth_client.get("/api/v1/auth/me")
+    invalid_token = auth_client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    for response in (missing_token, invalid_token):
+        assert response.status_code == 401
+        assert response.headers["www-authenticate"] == "Bearer"
+        assert response.json()["error"]["code"] == "unauthorized"
 
 
 def test_disabled_user_is_rejected_even_with_a_valid_token(

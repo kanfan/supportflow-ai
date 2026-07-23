@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -37,7 +38,12 @@ def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]
 
 
 def _error_response(
-    *, status_code: int, code: str, message: str, details: Any | None = None
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+    details: Any | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     payload = ErrorResponse(
         error=ErrorBody(code=code, message=message, details=details)
@@ -45,6 +51,7 @@ def _error_response(
     return JSONResponse(
         status_code=status_code,
         content=jsonable_encoder(payload.model_dump()),
+        headers=headers,
     )
 
 
@@ -65,6 +72,7 @@ async def http_exception_handler(_request: Request, exc: Exception) -> JSONRespo
         code=error_codes.get(exc.status_code, "http_error"),
         message=message,
         details=details,
+        headers=exc.headers,
     )
 
 
