@@ -18,6 +18,24 @@ class ErrorResponse(BaseModel):
     error: ErrorBody
 
 
+SENSITIVE_FIELD_MARKERS = ("password", "secret", "token")
+
+
+def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]:
+    safe_errors: list[dict[str, Any]] = []
+    for error in exc.errors():
+        safe_error = dict(error)
+        location = safe_error.get("loc", ())
+        if any(
+            marker in str(part).lower()
+            for part in location
+            for marker in SENSITIVE_FIELD_MARKERS
+        ):
+            safe_error.pop("input", None)
+        safe_errors.append(safe_error)
+    return safe_errors
+
+
 def _error_response(
     *, status_code: int, code: str, message: str, details: Any | None = None
 ) -> JSONResponse:
@@ -60,7 +78,7 @@ async def validation_exception_handler(
         status_code=422,
         code="validation_error",
         message="Request validation failed",
-        details=exc.errors(),
+        details=_safe_validation_errors(exc),
     )
 
 

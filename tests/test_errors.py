@@ -35,3 +35,21 @@ def test_validation_failure_uses_error_envelope() -> None:
     assert payload["error"]["code"] == "validation_error"
     assert payload["error"]["message"] == "Request validation failed"
     assert payload["error"]["details"]
+
+
+def test_validation_failure_does_not_echo_plaintext_password() -> None:
+    application = create_app(Settings(environment="test"))
+
+    with TestClient(application) as client:
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "safe@example.com",
+                "password": "short",
+                "organization_name": "Safe Organization",
+                "organization_slug": "safe-organization",
+            },
+        )
+
+    assert response.status_code == 422
+    assert '"short"' not in response.text
