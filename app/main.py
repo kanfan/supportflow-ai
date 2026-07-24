@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from app.api.auth import router as auth_router
 from app.auth.security import AccessTokenManager, PasswordManager
 from app.api.health import router as health_router
+from app.api.tickets import router as tickets_router
 from app.config import Settings, get_settings
 from app.errors import install_error_handlers
 from app.infrastructure.database import build_engine, build_session_factory
@@ -36,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(application)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(tickets_router)
     return application
 
 
