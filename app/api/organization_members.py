@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import (
@@ -11,7 +11,9 @@ from app.api.dependencies import (
 from app.identity.models import MembershipRole, OrganizationMember
 from app.identity.schemas import (
     OrganizationMemberCreateRequest,
+    OrganizationMemberListResponse,
     OrganizationMemberResponse,
+    PaginationResponse,
 )
 from app.identity.service import (
     MembershipConflictError,
@@ -38,16 +40,27 @@ def member_response(member: OrganizationMember) -> OrganizationMemberResponse:
     )
 
 
-@router.get("", response_model=list[OrganizationMemberResponse])
+@router.get("", response_model=OrganizationMemberListResponse)
 def list_organization_members(
     context: Annotated[OrganizationContext, Depends(require_admin)],
     session: Annotated[Session, Depends(get_database_session)],
-) -> list[OrganizationMemberResponse]:
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> OrganizationMemberListResponse:
     service = OrganizationMembershipService(session)
-    return [
-        member_response(member)
-        for member in service.list_members(context.organization.id)
-    ]
+    page = service.list_members(
+        organization_id=context.organization.id,
+        limit=limit,
+        offset=offset,
+    )
+    return OrganizationMemberListResponse(
+        items=[member_response(member) for member in page.items],
+        pagination=PaginationResponse(
+            limit=limit,
+            offset=offset,
+            total=page.total,
+        ),
+    )
 
 
 @router.post(

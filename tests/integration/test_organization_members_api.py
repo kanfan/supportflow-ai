@@ -1,11 +1,12 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,8 @@ from app.identity.models import (
     MembershipRole,
     MembershipStatus,
     OrganizationMember,
+    User,
+    UserStatus,
 )
 from app.main import create_app
 
@@ -130,13 +133,25 @@ def test_admin_adds_existing_user_and_lists_only_selected_tenant(
         headers=bearer_headers(admin_token, agent["organization"]["id"]),
     )
 
+    admin_members_body = admin_members.json()
+    agent_own_members_body = agent_own_members.json()
     assert admin_members.status_code == 200
-    assert {member["user_id"] for member in admin_members.json()} == {
+    assert admin_members_body["pagination"] == {
+        "limit": 20,
+        "offset": 0,
+        "total": 2,
+    }
+    assert {member["user_id"] for member in admin_members_body["items"]} == {
         admin["user"]["id"],
         agent["user"]["id"],
     }
     assert agent_own_members.status_code == 200
-    assert {member["user_id"] for member in agent_own_members.json()} == {
+    assert agent_own_members_body["pagination"] == {
+        "limit": 20,
+        "offset": 0,
+        "total": 1,
+    }
+    assert {member["user_id"] for member in agent_own_members_body["items"]} == {
         agent["user"]["id"]
     }
     assert cross_tenant_attempt.status_code == 404
@@ -149,6 +164,103 @@ def test_admin_adds_existing_user_and_lists_only_selected_tenant(
     assert membership is not None
     assert membership.role is MembershipRole.AGENT
     assert membership.status is MembershipStatus.ACTIVE
+
+
+def test_membership_list_paginates_in_deterministic_descending_order(
+    membership_client: TestClient,
+    database_engine: Engine,
+) -> None:
+    admin_prefix = f"page-admin-{uuid4().hex}"
+    admin = register(membership_client, admin_prefix)
+    targets = [
+        register(membership_client, f"page-target-{uuid4().hex}") for _ in range(4)
+    ]
+    admin_token = login(membership_client, admin["user"]["email"])
+    organization_id = UUID(admin["organization"]["id"])
+    target_ids = [UUID(target["user"]["id"]) for target in targets]
+    created_times = [
+        datetime(2030, 1, 1, tzinfo=UTC),
+        datetime(2029, 1, 1, tzinfo=UTC),
+        datetime(2029, 1, 1, tzinfo=UTC),
+        datetime(2025, 1, 1, tzinfo=UTC),
+    ]
+
+    with Session(database_engine) as session:
+        session.add_all(
+            [
+                OrganizationMember(
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    role=MembershipRole.AGENT,
+                    created_at=created_at,
+                )
+                for user_id, created_at in zip(
+                    target_ids,
+                    created_times,
+                    strict=True,
+                )
+            ]
+        )
+        session.commit()
+
+    tie_breaker_ids = sorted(target_ids[1:3], reverse=True)
+    first_page = membership_client.get(
+        "/api/v1/organization-members",
+        params={"limit": 3, "offset": 0},
+        headers=bearer_headers(admin_token, str(organization_id)),
+    )
+    second_page = membership_client.get(
+        "/api/v1/organization-members",
+        params={"limit": 2, "offset": 3},
+        headers=bearer_headers(admin_token, str(organization_id)),
+    )
+
+    assert first_page.status_code == 200
+    assert [UUID(item["user_id"]) for item in first_page.json()["items"]] == [
+        target_ids[0],
+        *tie_breaker_ids,
+    ]
+    assert first_page.json()["pagination"] == {
+        "limit": 3,
+        "offset": 0,
+        "total": 5,
+    }
+    assert second_page.status_code == 200
+    assert [UUID(item["user_id"]) for item in second_page.json()["items"]] == [
+        UUID(admin["user"]["id"]),
+        target_ids[3],
+    ]
+    assert second_page.json()["pagination"] == {
+        "limit": 2,
+        "offset": 3,
+        "total": 5,
+    }
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"limit": 0},
+        {"limit": 101},
+        {"offset": -1},
+    ],
+)
+def test_membership_list_rejects_invalid_pagination(
+    membership_client: TestClient,
+    params: dict[str, int],
+) -> None:
+    admin_prefix = f"page-bounds-{uuid4().hex}"
+    admin = register(membership_client, admin_prefix)
+    admin_token = login(membership_client, admin["user"]["email"])
+
+    response = membership_client.get(
+        "/api/v1/organization-members",
+        params=params,
+        headers=bearer_headers(admin_token, admin["organization"]["id"]),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
 
 
 def test_agent_is_forbidden_from_membership_administration(
@@ -253,6 +365,86 @@ def test_duplicate_membership_returns_conflict_without_changing_role(
         )
     assert len(memberships) == 1
     assert memberships[0].role is MembershipRole.AGENT
+
+
+def test_create_rejects_impersonation_shaped_extra_fields(
+    membership_client: TestClient,
+    database_engine: Engine,
+) -> None:
+    admin_prefix = f"extra-admin-{uuid4().hex}"
+    target_prefix = f"extra-target-{uuid4().hex}"
+    admin = register(membership_client, admin_prefix)
+    target = register(membership_client, target_prefix)
+    admin_token = login(membership_client, admin["user"]["email"])
+    base_payload = {"email": target["user"]["email"], "role": "agent"}
+    forged_fields: list[dict[str, str]] = [
+        {"user_id": str(uuid4())},
+        {"status": "active"},
+        {"organization_id": str(uuid4())},
+        {"actor_user_id": str(uuid4())},
+    ]
+
+    for forged_field in forged_fields:
+        response = membership_client.post(
+            "/api/v1/organization-members",
+            headers=bearer_headers(admin_token, admin["organization"]["id"]),
+            json={**base_payload, **forged_field},
+        )
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "validation_error"
+
+    with Session(database_engine) as session:
+        membership = session.get(
+            OrganizationMember,
+            (admin["organization"]["id"], target["user"]["id"]),
+        )
+    assert membership is None
+
+
+def test_disabled_target_is_indistinguishable_from_missing_user(
+    membership_client: TestClient,
+    database_engine: Engine,
+) -> None:
+    admin_prefix = f"disabled-target-admin-{uuid4().hex}"
+    target_prefix = f"disabled-target-{uuid4().hex}"
+    admin = register(membership_client, admin_prefix)
+    target = register(membership_client, target_prefix)
+    admin_token = login(membership_client, admin["user"]["email"])
+
+    with database_engine.begin() as connection:
+        connection.execute(
+            update(User)
+            .where(User.id == target["user"]["id"])
+            .values(status=UserStatus.DISABLED)
+        )
+
+    disabled_response = add_agent(
+        membership_client,
+        token=admin_token,
+        organization_id=admin["organization"]["id"],
+        email=target["user"]["email"],
+    )
+    missing_response = add_agent(
+        membership_client,
+        token=admin_token,
+        organization_id=admin["organization"]["id"],
+        email=f"missing-{uuid4().hex}@example.com",
+    )
+
+    assert disabled_response.status_code == 404
+    assert disabled_response.json() == missing_response.json()
+    assert disabled_response.json()["error"] == {
+        "code": "not_found",
+        "message": "User not found",
+        "details": None,
+    }
+
+    with Session(database_engine) as session:
+        membership = session.get(
+            OrganizationMember,
+            (admin["organization"]["id"], target["user"]["id"]),
+        )
+    assert membership is None
 
 
 def test_create_rejects_admin_role_and_unknown_user(

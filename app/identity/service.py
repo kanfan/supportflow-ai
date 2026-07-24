@@ -1,6 +1,7 @@
+from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -21,22 +22,42 @@ class MembershipUserNotFoundError(ValueError):
     """Raised when the target email does not identify an active user."""
 
 
+@dataclass(frozen=True)
+class OrganizationMemberPage:
+    items: list[OrganizationMember]
+    total: int
+
+
 class OrganizationMembershipService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_members(self, organization_id: UUID) -> list[OrganizationMember]:
-        return list(
+    def list_members(
+        self,
+        *,
+        organization_id: UUID,
+        limit: int,
+        offset: int,
+    ) -> OrganizationMemberPage:
+        total = self._session.scalar(
+            select(func.count())
+            .select_from(OrganizationMember)
+            .where(OrganizationMember.organization_id == organization_id)
+        )
+        items = list(
             self._session.scalars(
                 select(OrganizationMember)
                 .options(joinedload(OrganizationMember.user))
                 .where(OrganizationMember.organization_id == organization_id)
                 .order_by(
-                    OrganizationMember.created_at.asc(),
-                    OrganizationMember.user_id.asc(),
+                    OrganizationMember.created_at.desc(),
+                    OrganizationMember.user_id.desc(),
                 )
+                .limit(limit)
+                .offset(offset)
             )
         )
+        return OrganizationMemberPage(items=items, total=total or 0)
 
     def add_agent(
         self,

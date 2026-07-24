@@ -2,12 +2,14 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from app.identity.models import MembershipRole, MembershipStatus
 
 
 class OrganizationMemberCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email: EmailStr
     role: Literal[MembershipRole.AGENT]
 
@@ -26,3 +28,14 @@ class OrganizationMemberResponse(BaseModel):
     status: MembershipStatus
     created_at: datetime
     updated_at: datetime
+
+
+class PaginationResponse(BaseModel):
+    limit: int
+    offset: int
+    total: int
+
+
+class OrganizationMemberListResponse(BaseModel):
+    items: list[OrganizationMemberResponse]
+    pagination: PaginationResponse
