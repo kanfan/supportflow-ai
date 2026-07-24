@@ -1,9 +1,9 @@
 # ADR 0003: Week 3 security, workflow, audit, and UI contracts
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-24
 - Tracks: #19
-- Depends on: #18
+- Prerequisite: #18, merged into `main` as `8a792d3`
 
 ## Context
 
@@ -34,7 +34,8 @@ decision in this ADR applies only after both contributors explicitly accept it.
 
 Week 3 will use the following dependency order:
 
-1. PR #18 completes the tenant-scoped ticket foundation.
+1. PR #18 completed the tenant-scoped ticket foundation and merged into `main`
+   as `8a792d3`.
 2. Issue #19 freezes this contract.
 3. Emir implements #20, including the only Week 3 migration:
    `0003_audit_events`.
@@ -304,8 +305,8 @@ only by an informal browser demonstration.
 - production latency objectives. Week 3 records a repeatable baseline rather than
   inventing an SLA.
 
-## Required approval
+## Approval
 
-Emir and Eray should review the authorization matrix, transaction boundary, UI
-session approach, and migration ownership before changing this ADR from Proposed
-to Accepted.
+Emir and Eray accepted the authorization matrix, transaction boundary, UI session
+approach, and migration ownership after reviewing the clarifications in `c7aa28e`
+and the merged ticket foundation from PR #18.
