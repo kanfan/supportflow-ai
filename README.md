@@ -4,7 +4,9 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status:** Week 1 local walking skeleton is implemented and verified in CI. Week 2 database and identity foundations are in progress. Authentication endpoints, tickets, document ingestion, and AI/RAG remain planned work.
+> **Project status:** Week 1 is complete. Week 2 now includes the identity schema,
+> authentication, verified organization context, and the first tenant-scoped ticket
+> workflow. Document ingestion and AI/RAG remain planned work.
 
 ## The problem
 
@@ -194,7 +196,7 @@ $registration = @{
   organization_slug = "example-company"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Method Post `
+$registered = Invoke-RestMethod -Method Post `
   -Uri http://127.0.0.1:8000/api/v1/auth/register `
   -ContentType "application/json" `
   -Body $registration
@@ -217,6 +219,43 @@ Invoke-RestMethod -Method Get `
 Tenant-owned endpoints additionally require `X-Organization-ID`. The API verifies
 that header against the authenticated user's active membership; it never trusts an
 organization or role supplied inside a token.
+
+### Ticket flow
+
+Ticket creation requires an initial message and writes both records in one database
+transaction. The authenticated membership supplies the agent identity; clients
+cannot submit another `author_user_id`.
+
+Continue the authentication example above:
+
+```powershell
+$tenantHeaders = @{
+  Authorization = "Bearer $($token.access_token)"
+  "X-Organization-ID" = $registered.organization.id
+}
+
+$ticketRequest = @{
+  subject = "Unable to export a report"
+  initial_message = @{
+    author_type = "agent"
+    body = "Customer reported a reproducible export problem."
+  }
+} | ConvertTo-Json -Depth 3
+
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/api/v1/tickets `
+  -Headers $tenantHeaders `
+  -ContentType "application/json" `
+  -Body $ticketRequest
+
+Invoke-RestMethod -Method Get `
+  -Uri http://127.0.0.1:8000/api/v1/tickets `
+  -Headers $tenantHeaders
+```
+
+The list endpoint uses `limit`/`offset` pagination and always filters by the verified
+organization. Ticket status transitions are currently enforced in the service layer
+as `open -> processing -> waiting_for_agent -> resolved -> closed`.
 
 ### Database migrations
 
@@ -288,6 +327,7 @@ The complete project plan is available in [SupportFlow_AI_Emir_Eray_Proje_Plani_
 
 - [API conventions](./docs/api-conventions.md)
 - [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
+- [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)
 
 The plan is a roadmap, not an implementation claim. This README will evolve as working features, tests, measurements, and known limitations are added.
 

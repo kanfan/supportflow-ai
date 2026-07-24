@@ -8,6 +8,7 @@ from sqlalchemy import engine_from_config, pool
 from app.config import get_settings
 from app.identity import models as identity_models  # noqa: F401
 from app.infrastructure.database import Base
+from app.tickets import models as ticket_models  # noqa: F401
 
 
 config = context.config

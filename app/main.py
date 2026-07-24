@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.organization_members import router as organization_members_router
+from app.api.tickets import router as tickets_router
 from app.auth.security import AccessTokenManager, PasswordManager
 from app.config import Settings, get_settings
 from app.errors import install_error_handlers
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(organization_members_router)
+    application.include_router(tickets_router)
     return application
 
 
