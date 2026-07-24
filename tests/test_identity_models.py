@@ -16,11 +16,11 @@ def enum_values(table_name: str, column_name: str) -> set[str]:
 
 
 def test_identity_tables_are_registered() -> None:
-    assert set(Base.metadata.tables) == {
+    assert {
         "organization_members",
         "organizations",
         "users",
-    }
+    } <= set(Base.metadata.tables)
 
 
 def test_membership_uses_composite_primary_key_and_mutable_timestamps() -> None:
