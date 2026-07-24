@@ -158,6 +158,17 @@ def test_ticket_listing_and_customer_lookup_are_tenant_scoped(
     assert first_create.status_code == 201
     assert second_create.status_code == 201
 
+    first_tenant_list = ticket_client.get(
+        "/api/v1/tickets",
+        headers=tenant_headers(first_token, first_organization_id),
+    )
+    assert first_tenant_list.status_code == 200
+    first_tenant_ticket_ids = {
+        ticket["id"] for ticket in first_tenant_list.json()["items"]
+    }
+    assert first_create.json()["id"] in first_tenant_ticket_ids
+    assert second_create.json()["id"] not in first_tenant_ticket_ids
+
     cross_tenant_list = ticket_client.get(
         "/api/v1/tickets",
         headers=tenant_headers(first_token, second_organization_id),
@@ -248,7 +259,61 @@ def test_database_rejects_cross_tenant_and_invalid_message_authors(
     database_session.add(valid_ticket)
     database_session.flush()
 
+    valid_customer_message = TicketMessage(
+        organization_id=first_organization.id,
+        ticket_id=valid_ticket.id,
+        author_type=MessageAuthorType.CUSTOMER,
+        author_customer_id=first_customer.id,
+        body="Valid matching customer",
+    )
+    valid_system_message = TicketMessage(
+        organization_id=first_organization.id,
+        ticket_id=valid_ticket.id,
+        author_type=MessageAuthorType.SYSTEM,
+        body="Valid system event",
+    )
+    database_session.add_all([valid_customer_message, valid_system_message])
+    database_session.flush()
+    assert valid_customer_message.id is not None
+    assert valid_system_message.id is not None
+
     invalid_messages = [
+        TicketMessage(
+            organization_id=first_organization.id,
+            ticket_id=valid_ticket.id,
+            author_type=MessageAuthorType.CUSTOMER,
+            body="Customer identity is missing",
+        ),
+        TicketMessage(
+            organization_id=first_organization.id,
+            ticket_id=valid_ticket.id,
+            author_type=MessageAuthorType.CUSTOMER,
+            author_user_id=first_user.id,
+            author_customer_id=first_customer.id,
+            body="Customer cannot also be an agent",
+        ),
+        TicketMessage(
+            organization_id=first_organization.id,
+            ticket_id=valid_ticket.id,
+            author_type=MessageAuthorType.AGENT,
+            author_user_id=first_user.id,
+            author_customer_id=first_customer.id,
+            body="Agent cannot also be a customer",
+        ),
+        TicketMessage(
+            organization_id=first_organization.id,
+            ticket_id=valid_ticket.id,
+            author_type=MessageAuthorType.SYSTEM,
+            author_user_id=first_user.id,
+            body="System cannot use a user identity",
+        ),
+        TicketMessage(
+            organization_id=first_organization.id,
+            ticket_id=valid_ticket.id,
+            author_type=MessageAuthorType.SYSTEM,
+            author_customer_id=first_customer.id,
+            body="System cannot use a customer identity",
+        ),
         TicketMessage(
             organization_id=first_organization.id,
             ticket_id=valid_ticket.id,
