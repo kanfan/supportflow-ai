@@ -71,12 +71,14 @@ Week 3 membership administration is intentionally narrow:
 
 - `GET /api/v1/organization-members` lists memberships for the verified
   `X-Organization-ID` context.
-- `POST /api/v1/organization-members` accepts an existing normalized user email
-  and the `agent` role.
+- `POST /api/v1/organization-members` accepts an existing, active user's
+  normalized email and the `agent` role.
 - Both endpoints are admin-only.
 - Invites, creating a user on another person's behalf, removing the final admin,
   and generic role/status management are deferred.
 - Adding a membership that already exists returns `409 Conflict`.
+- A missing or disabled target user returns the same `404 User not found`
+  response, and neither case creates a membership.
 
 The narrow endpoint is sufficient for the two-user Week 3 demo without pretending
 that a complete invitation lifecycle exists.
@@ -162,6 +164,11 @@ They combine with the mandatory `organization_id` filter. Results retain
 | `metadata` | Required JSON object, default `{}`, restricted to safe structured values |
 | `created_at` | Required `TIMESTAMPTZ`, database default |
 
+The database column remains named `metadata`, but SQLAlchemy Declarative reserves
+`metadata` as a Python attribute. The ORM model therefore maps it through a
+different attribute, for example
+`event_metadata = mapped_column("metadata", JSON, ...)`.
+
 The initial action vocabulary is:
 
 - `organization_member.created`;
@@ -215,9 +222,11 @@ browser adapter backed by a signed session cookie:
 - production-like environments set `Secure`;
 - the cookie never contains a password or bearer token;
 - the session stores only minimal identifiers and a CSRF value;
+- successful login discards all pre-authentication session state, creates a new
+  authenticated session, and rotates the CSRF value before setting the cookie;
 - the selected organization remains untrusted and is revalidated against an
   active database membership on every request;
-- sign-out clears the session;
+- sign-out invalidates the authenticated session state and clears the cookie;
 - state-changing HTML forms require a session-bound CSRF token;
 - state changes never use `GET`.
 
