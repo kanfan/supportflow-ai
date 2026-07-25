@@ -4,9 +4,10 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status:** Week 1 is complete. Week 2 now includes the identity schema,
+> **Project status:** Week 1 is complete. Week 2 includes the identity schema,
 > authentication, verified organization context, and the first tenant-scoped ticket
-> workflow. Document ingestion and AI/RAG remain planned work.
+> workflow. Week 3 adds admin-only membership administration and the tenant-scoped
+> audit foundation. Document ingestion and AI/RAG remain planned work.
 
 ## The problem
 
@@ -257,6 +258,31 @@ The list endpoint uses `limit`/`offset` pagination and always filters by the ver
 organization. Ticket status transitions are currently enforced in the service layer
 as `open -> processing -> waiting_for_agent -> resolved -> closed`.
 
+### Membership and audit flow
+
+An authenticated organization `admin` can list memberships and add an existing,
+active user as an `agent` through `/api/v1/organization-members`. An `agent`
+receives `403 Forbidden` from this administration surface.
+
+Membership creation and its `organization_member.created` audit event commit in
+the same database transaction. If either write fails, both are rolled back. Audit
+rows are tenant-scoped, append-only, and expose only action-specific metadata
+allowlists—never passwords, tokens, authorization headers, raw message bodies, or
+arbitrary request payloads.
+
+Admins can read their selected organization's audit timeline with deterministic
+pagination:
+
+```powershell
+Invoke-RestMethod -Method Get `
+  -Uri "http://127.0.0.1:8000/api/v1/audit-events?limit=20&offset=0" `
+  -Headers $tenantHeaders
+```
+
+The audit service also defines the safe interfaces used by later ticket creation,
+message, and status-transition integration. Repositories add rows but never commit
+independently; the business service owns the transaction.
+
 ### Database migrations
 
 Alembic migrations are the version history for the PostgreSQL schema. Apply every
@@ -328,6 +354,7 @@ The complete project plan is available in [SupportFlow_AI_Emir_Eray_Proje_Plani_
 - [API conventions](./docs/api-conventions.md)
 - [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
 - [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)
+- [ADR 0003: Week 3 security, workflow, audit, and UI contracts](./docs/adr/0003-week-3-security-workflow-and-ui-contracts.md)
 
 The plan is a roadmap, not an implementation claim. This README will evolve as working features, tests, measurements, and known limitations are added.
 

@@ -77,6 +77,7 @@ def add_organization_member(
     try:
         membership = service.add_agent(
             organization_id=context.organization.id,
+            actor_user_id=context.membership.user_id,
             normalized_email=str(request.email),
         )
     except MembershipUserNotFoundError:
