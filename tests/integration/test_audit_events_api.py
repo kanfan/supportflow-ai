@@ -7,13 +7,12 @@ from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import Table, insert, inspect, select, update
+from sqlalchemy import Table, func, insert, inspect, select, text, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.audit.models import AuditAction, AuditEvent, AuditResourceType
-from app.audit.repository import AuditEventRepository
 from app.config import Settings
 from app.identity.models import OrganizationMember
 from app.main import create_app
@@ -116,17 +115,20 @@ def test_audit_migration_has_expected_columns_constraints_index_and_trigger(
     assert "ix_audit_events_organization_created_id" in indexes
 
     with database_engine.connect() as connection:
-        trigger_exists = connection.exec_driver_sql(
-            """
-            SELECT EXISTS (
-                SELECT 1
+        trigger_names = set(
+            connection.exec_driver_sql(
+                """
+                SELECT tgname
                 FROM pg_trigger
-                WHERE tgname = 'audit_events_append_only'
+                WHERE tgrelid = 'audit_events'::regclass
                   AND NOT tgisinternal
-            )
-            """
-        ).scalar_one()
-    assert trigger_exists is True
+                """
+            ).scalars()
+        )
+    assert trigger_names >= {
+        "audit_events_append_only",
+        "audit_events_append_only_truncate",
+    }
 
 
 def test_membership_and_audit_event_commit_together_with_safe_metadata(
@@ -179,7 +181,7 @@ def test_membership_and_audit_event_commit_together_with_safe_metadata(
         assert forbidden_value not in serialized_metadata
 
 
-def test_forced_audit_failure_rolls_back_membership_and_event(
+def test_failure_after_database_flush_rolls_back_membership_and_event(
     audit_client: TestClient,
     database_engine: Engine,
     monkeypatch: pytest.MonkeyPatch,
@@ -187,38 +189,63 @@ def test_forced_audit_failure_rolls_back_membership_and_event(
     admin = register(audit_client, f"rollback-admin-{uuid4().hex}")
     target = register(audit_client, f"rollback-target-{uuid4().hex}")
     token = login(audit_client, admin["user"]["email"])
+    organization_id = UUID(admin["organization"]["id"])
+    target_user_id = UUID(target["user"]["id"])
+    flushed_to_database = False
 
-    def fail_audit_add(
-        _repository: AuditEventRepository,
-        _event: AuditEvent,
-    ) -> None:
-        raise RuntimeError("forced audit failure")
+    def flush_then_fail(session: Session) -> None:
+        nonlocal flushed_to_database
+        session.flush()
+        membership_count = session.scalar(
+            select(func.count())
+            .select_from(OrganizationMember)
+            .where(
+                OrganizationMember.organization_id == organization_id,
+                OrganizationMember.user_id == target_user_id,
+            )
+        )
+        audit_count = session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.organization_id == organization_id,
+                AuditEvent.resource_id == target_user_id,
+            )
+        )
+        assert membership_count == 1
+        assert audit_count == 1
+        flushed_to_database = True
+        raise RuntimeError("forced failure after database flush")
 
-    monkeypatch.setattr(AuditEventRepository, "add", fail_audit_add)
+    monkeypatch.setattr(Session, "commit", flush_then_fail)
 
-    with pytest.raises(RuntimeError, match="forced audit failure"):
+    with pytest.raises(RuntimeError, match="forced failure after database flush"):
         add_agent(
             audit_client,
             token=token,
-            organization_id=admin["organization"]["id"],
+            organization_id=str(organization_id),
             email=target["user"]["email"],
         )
 
-    with Session(database_engine) as session:
-        membership = session.get(
-            OrganizationMember,
-            (admin["organization"]["id"], target["user"]["id"]),
-        )
-        audit_count = len(
-            list(
-                session.scalars(
-                    select(AuditEvent).where(
-                        AuditEvent.organization_id == admin["organization"]["id"]
-                    )
-                )
+    assert flushed_to_database is True
+    with Session(database_engine) as verification_session:
+        membership_count = verification_session.scalar(
+            select(func.count())
+            .select_from(OrganizationMember)
+            .where(
+                OrganizationMember.organization_id == organization_id,
+                OrganizationMember.user_id == target_user_id,
             )
         )
-    assert membership is None
+        audit_count = verification_session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.organization_id == organization_id,
+                AuditEvent.resource_id == target_user_id,
+            )
+        )
+    assert membership_count == 0
     assert audit_count == 0
 
 
@@ -475,6 +502,40 @@ def test_audit_rows_are_database_enforced_append_only(
         unchanged = session.get(AuditEvent, event_id)
         assert unchanged is not None
         assert unchanged.action == AuditAction.ORGANIZATION_MEMBER_CREATED
+
+
+def test_audit_rows_reject_truncate_and_existing_rows_remain(
+    audit_client: TestClient,
+    database_engine: Engine,
+) -> None:
+    admin = register(audit_client, f"truncate-admin-{uuid4().hex}")
+    target = register(audit_client, f"truncate-target-{uuid4().hex}")
+    token = login(audit_client, admin["user"]["email"])
+    organization_id = UUID(admin["organization"]["id"])
+    assert (
+        add_agent(
+            audit_client,
+            token=token,
+            organization_id=str(organization_id),
+            email=target["user"]["email"],
+        ).status_code
+        == 201
+    )
+
+    with Session(database_engine) as session:
+        existing_event_id = session.scalar(
+            select(AuditEvent.id).where(AuditEvent.organization_id == organization_id)
+        )
+        assert existing_event_id is not None
+
+        with pytest.raises(SQLAlchemyError):
+            session.execute(text("TRUNCATE TABLE audit_events"))
+        session.rollback()
+
+    with Session(database_engine) as verification_session:
+        preserved_event = verification_session.get(AuditEvent, existing_event_id)
+    assert preserved_event is not None
+    assert preserved_event.action == AuditAction.ORGANIZATION_MEMBER_CREATED
 
 
 @pytest.mark.parametrize("method", ["PUT", "PATCH", "DELETE"])

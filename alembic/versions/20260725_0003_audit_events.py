@@ -94,6 +94,14 @@ def upgrade() -> None:
         EXECUTE FUNCTION prevent_audit_event_mutation()
         """
     )
+    op.execute(
+        """
+        CREATE TRIGGER audit_events_append_only_truncate
+        BEFORE TRUNCATE ON audit_events
+        FOR EACH STATEMENT
+        EXECUTE FUNCTION prevent_audit_event_mutation()
+        """
+    )
 
 
 def downgrade() -> None:

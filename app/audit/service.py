@@ -7,13 +7,19 @@ from sqlalchemy.orm import Session
 
 from app.audit.models import AuditAction, AuditEvent, AuditResourceType
 from app.audit.repository import AuditEventPage, AuditEventRepository
+from app.identity.models import MembershipRole
+from app.tickets.models import TicketSourceType, TicketStatus
 
 
-TICKET_STATUSES: Final = frozenset(
-    {"open", "processing", "waiting_for_agent", "resolved", "closed"}
+TICKET_STATUSES: Final[frozenset[str]] = frozenset(
+    status.value for status in TicketStatus
 )
-TICKET_SOURCE_TYPES: Final = frozenset({"manual", "api"})
-MEMBERSHIP_ROLES: Final = frozenset({"admin", "agent"})
+TICKET_SOURCE_TYPES: Final[frozenset[str]] = frozenset(
+    source_type.value for source_type in TicketSourceType
+)
+MEMBERSHIP_ROLES: Final[frozenset[str]] = frozenset(
+    role.value for role in MembershipRole
+)
 
 
 class AuditMetadataError(ValueError):

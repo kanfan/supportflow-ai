@@ -277,6 +277,10 @@ rows are tenant-scoped, append-only, and expose only action-specific metadata
 allowlists—never passwords, tokens, authorization headers, raw message bodies, or
 arbitrary request payloads.
 
+PostgreSQL rejects normal `UPDATE`, `DELETE`, and `TRUNCATE` operations on the
+audit table. This protects against application-role mistakes; it does not claim to
+protect against a privileged database owner who can disable or remove triggers.
+
 Admins can read their selected organization's audit timeline with deterministic
 pagination:
 
