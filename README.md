@@ -4,10 +4,10 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status:** Week 1 is complete. Week 2 includes the identity schema,
-> authentication, verified organization context, and the first tenant-scoped ticket
-> workflow. Week 3 adds admin-only membership administration and the tenant-scoped
-> audit foundation. Document ingestion and AI/RAG remain planned work.
+> **Project status:** The foundation and core support backend are complete on
+> `main`: authentication, verified organization context, admin/agent membership
+> controls, and tenant-scoped ticket and message workflows. Audit events are in
+> progress. Document ingestion and AI/RAG remain planned work.
 
 ## The problem
 
@@ -68,9 +68,12 @@ Redis queue ------> Celery worker
 
 Runtime and development dependencies are declared in `pyproject.toml` and resolved reproducibly through `uv.lock`.
 
-## Current milestone: local walking skeleton
+## Current milestone: Week 3 security and workflow foundation
 
-The first milestone is deliberately small. It proves that our development environment and collaboration workflow work before we add authentication, business rules, or AI.
+The current `main` branch proves the local development foundation,
+authentication and role boundaries, organization isolation, and the first
+end-to-end ticket workflow. The next security layer adds append-only audit
+events before document ingestion and AI/RAG work begins.
 
 ### Acceptance criteria
 
@@ -80,7 +83,11 @@ The first milestone is deliberately small. It proves that our development enviro
 - [x] Automated tests cover the API contract and worker foundation.
 - [x] Linting and type checking run successfully.
 - [x] Continuous integration runs on pull requests and the main branch.
-- [ ] A second contributor can follow this README on a clean machine.
+- [x] Authentication reloads verified organization membership and role context from PostgreSQL.
+- [x] Admin/agent RBAC protects organization-membership operations.
+- [x] Tenant-scoped tickets and messages support strict status transitions, filtering, and pagination.
+- [ ] Append-only audit events are integrated with ticket mutations.
+- [ ] Document ingestion and AI/RAG are implemented.
 
 ## Initial ownership
 
