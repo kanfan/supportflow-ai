@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.audit.service import AuditEventService
 from app.identity.models import (
     MembershipRole,
     MembershipStatus,
@@ -63,6 +64,7 @@ class OrganizationMembershipService:
         self,
         *,
         organization_id: UUID,
+        actor_user_id: UUID,
         normalized_email: str,
     ) -> OrganizationMember:
         user = self._session.scalar(
@@ -90,9 +92,20 @@ class OrganizationMembershipService:
         self._session.add(membership)
 
         try:
+            AuditEventService(
+                self._session,
+                organization_id,
+            ).record_organization_member_created(
+                actor_user_id=actor_user_id,
+                member_user_id=user.id,
+                role=membership.role,
+            )
             self._session.commit()
         except IntegrityError as exc:
             self._session.rollback()
             raise MembershipConflictError from exc
+        except Exception:
+            self._session.rollback()
+            raise
 
         return membership

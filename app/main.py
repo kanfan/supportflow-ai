@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.audit_events import router as audit_events_router
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.organization_members import router as organization_members_router
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(application)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(audit_events_router)
     application.include_router(organization_members_router)
     application.include_router(tickets_router)
     return application

@@ -55,9 +55,24 @@ def database_engine(migrated_database_url: str) -> Iterator[Engine]:
 def clean_identity_tables(database_engine: Engine) -> Iterator[None]:
     def truncate() -> None:
         with database_engine.begin() as connection:
+            # This fixture is restricted above to the disposable supportflow_test
+            # database. Temporarily bypass only the TRUNCATE guard so tests can
+            # reset state; production code never disables the audit trigger.
+            connection.execute(
+                text(
+                    "ALTER TABLE audit_events "
+                    "DISABLE TRIGGER audit_events_append_only_truncate"
+                )
+            )
             connection.execute(
                 text(
                     "TRUNCATE TABLE organization_members, users, organizations CASCADE"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE audit_events "
+                    "ENABLE TRIGGER audit_events_append_only_truncate"
                 )
             )
 
