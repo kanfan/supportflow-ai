@@ -291,6 +291,10 @@ remain server-side; login replaces the pre-authentication session and rotates th
 CSRF token, while logout invalidates the server-side session. Staging and
 production cookies also use `Secure`.
 
+The Week 3 session store is intentionally in-process and suitable for the
+single-process demo. Shared, durable session storage for multiple API instances
+remains a production follow-up recorded in ADR 0003.
+
 ### Membership and audit flow
 
 An authenticated organization `admin` can list memberships and add an existing,

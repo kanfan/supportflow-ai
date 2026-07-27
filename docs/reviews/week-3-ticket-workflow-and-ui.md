@@ -69,6 +69,10 @@ may exist.
 The API continues to use bearer JWTs. The browser adapter does not store a
 bearer token in cookies, URLs, HTML, or local storage.
 
+The current server-side store is process-local for the Week 3 single-process
+demo. Horizontal scaling requires shared, durable session storage; ADR 0003
+deliberately defers that production decision.
+
 ## Why the tests exist
 
 `tests/integration/test_week3_ticket_workflow.py` proves the security contracts:
