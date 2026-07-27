@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -65,11 +65,23 @@ async def http_exception_handler(_request: Request, exc: Exception) -> JSONRespo
         404: "not_found",
         409: "conflict",
     }
-    message = exc.detail if isinstance(exc.detail, str) else "Request failed"
-    details = None if isinstance(exc.detail, str) else exc.detail
+    detail = exc.detail
+    if (
+        isinstance(detail, dict)
+        and isinstance(detail.get("code"), str)
+        and isinstance(detail.get("message"), str)
+    ):
+        detail_payload = cast(dict[str, Any], detail)
+        code = str(detail_payload["code"])
+        message = str(detail_payload["message"])
+        details = detail_payload.get("details")
+    else:
+        code = error_codes.get(exc.status_code, "http_error")
+        message = detail if isinstance(detail, str) else "Request failed"
+        details = None if isinstance(detail, str) else detail
     return _error_response(
         status_code=exc.status_code,
-        code=error_codes.get(exc.status_code, "http_error"),
+        code=code,
         message=message,
         details=details,
         headers=exc.headers,

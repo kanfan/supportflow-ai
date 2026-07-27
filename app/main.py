@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 from fastapi import FastAPI
 
@@ -12,6 +13,8 @@ from app.auth.security import AccessTokenManager, PasswordManager
 from app.config import Settings, get_settings
 from app.errors import install_error_handlers
 from app.infrastructure.database import build_engine, build_session_factory
+from app.ui.router import router as ui_router
+from app.ui.session import BrowserSessionStore
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -36,12 +39,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.access_token_manager = AccessTokenManager.from_settings(
         resolved_settings
     )
+    application.state.browser_session_store = BrowserSessionStore(
+        secret_key=resolved_settings.auth_secret_key.get_secret_value(),
+        lifetime=timedelta(minutes=resolved_settings.ui_session_ttl_minutes),
+    )
     install_error_handlers(application)
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(audit_events_router)
     application.include_router(organization_members_router)
     application.include_router(tickets_router)
+    application.include_router(ui_router)
     return application
 
 

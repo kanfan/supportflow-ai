@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.tickets.models import (
     MessageAuthorType,
@@ -25,7 +25,7 @@ class InitialMessageRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     body: NonEmptyBody
-    author_type: Literal["customer", "agent"] = "agent"
+    author_type: Literal["agent"] = "agent"
 
 
 class TicketCreateRequest(BaseModel):
@@ -37,16 +37,17 @@ class TicketCreateRequest(BaseModel):
     external_id: str | None = Field(default=None, max_length=255)
     initial_message: InitialMessageRequest
 
-    @model_validator(mode="after")
-    def require_customer_for_customer_message(self) -> "TicketCreateRequest":
-        if (
-            self.initial_message.author_type == MessageAuthorType.CUSTOMER
-            and self.customer_id is None
-        ):
-            raise ValueError(
-                "customer_id is required for a customer-authored initial message"
-            )
-        return self
+
+class TicketMessageCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: NonEmptyBody
+
+
+class TicketStatusUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: TicketStatus
 
 
 class TicketResponse(BaseModel):
@@ -78,6 +79,10 @@ class TicketMessageResponse(BaseModel):
 
 class TicketCreateResponse(TicketResponse):
     initial_message: TicketMessageResponse
+
+
+class TicketDetailResponse(TicketResponse):
+    messages: list[TicketMessageResponse]
 
 
 class PaginationResponse(BaseModel):
