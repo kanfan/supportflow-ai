@@ -113,6 +113,7 @@ workflows, and the first server-rendered agent workspace.
 - [x] Tenant-scoped tickets and messages support strict status transitions, filtering, and pagination.
 - [x] Append-only audit events are integrated atomically with ticket mutations.
 - [x] The agent UI rotates server-side sessions and protects state-changing forms with CSRF tokens.
+- [x] Week 3 threat, fresh-DB E2E, sensitive-output, and fixed-dataset performance evidence is reproducible.
 - [ ] Document ingestion and AI/RAG are implemented.
 
 ## Initial ownership
@@ -425,6 +426,8 @@ The complete AWS-aligned project plan (revision 1.2) is available in
 - [ADR 0004: AWS deployment platform](./docs/adr/0004-aws-deployment-platform.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
+- [Week 3 threat model](./docs/security/week-3-threat-model.md)
+- [Week 3 release verification](./docs/reviews/week-3-verification.md)
 
 The plan is a roadmap, not an implementation claim. This README will evolve as working features, tests, measurements, and known limitations are added.
 
