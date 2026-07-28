@@ -6,8 +6,9 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 
 > **Project status:** The foundation and core support backend are complete on
 > `main`: authentication, verified organization context, admin/agent membership
-> controls, and tenant-scoped ticket and message workflows. Audit events are in
-> progress. Document ingestion and AI/RAG remain planned work.
+> controls, tenant-scoped ticket workflows, append-only audit events, and a
+> minimal authenticated agent workspace. Document ingestion and AI/RAG remain
+> planned work.
 
 ## The problem
 
@@ -71,9 +72,8 @@ Runtime and development dependencies are declared in `pyproject.toml` and resolv
 ## Current milestone: Week 3 security and workflow foundation
 
 The current `main` branch proves the local development foundation,
-authentication and role boundaries, organization isolation, and the first
-end-to-end ticket workflow. The next security layer adds append-only audit
-events before document ingestion and AI/RAG work begins.
+authentication and role boundaries, organization isolation, atomic ticket/audit
+workflows, and the first server-rendered agent workspace.
 
 ### Acceptance criteria
 
@@ -86,7 +86,8 @@ events before document ingestion and AI/RAG work begins.
 - [x] Authentication reloads verified organization membership and role context from PostgreSQL.
 - [x] Admin/agent RBAC protects organization-membership operations.
 - [x] Tenant-scoped tickets and messages support strict status transitions, filtering, and pagination.
-- [ ] Append-only audit events are integrated with ticket mutations.
+- [x] Append-only audit events are integrated atomically with ticket mutations.
+- [x] The agent UI rotates server-side sessions and protects state-changing forms with CSRF tokens.
 - [ ] Document ingestion and AI/RAG are implemented.
 
 ## Initial ownership
@@ -261,9 +262,38 @@ Invoke-RestMethod -Method Get `
   -Headers $tenantHeaders
 ```
 
-The list endpoint uses `limit`/`offset` pagination and always filters by the verified
-organization. Ticket status transitions are currently enforced in the service layer
-as `open -> processing -> waiting_for_agent -> resolved -> closed`.
+The list endpoint uses `limit`/`offset` pagination, supports `status`,
+`source_type`, and `customer_id` filters, and always filters by the verified
+organization. Ticket detail and agent mutations are available at:
+
+- `GET /api/v1/tickets/{ticket_id}`;
+- `POST /api/v1/tickets/{ticket_id}/messages`;
+- `PATCH /api/v1/tickets/{ticket_id}/status`.
+
+The service enforces `open -> processing -> waiting_for_agent -> resolved ->
+closed`. Ticket creation, agent messages, and valid status changes commit their
+allowlisted audit events in the same transaction. Invalid transitions return the
+stable `invalid_ticket_transition` error without changing either table.
+
+### Agent workspace
+
+Open `http://127.0.0.1:8000/ui/login` and sign in with an active user's email,
+password, and organization slug. The workspace provides:
+
+- tenant-scoped ticket filters and pagination;
+- ticket detail and message timeline;
+- agent-authored message and next-status forms;
+- safe `403`/`404`/`409` feedback.
+
+The browser never stores a bearer token. Its signed `HttpOnly`, `SameSite=Lax`
+cookie contains only an opaque session identifier. Session state and CSRF values
+remain server-side; login replaces the pre-authentication session and rotates the
+CSRF token, while logout invalidates the server-side session. Staging and
+production cookies also use `Secure`.
+
+The Week 3 session store is intentionally in-process and suitable for the
+single-process demo. Shared, durable session storage for multiple API instances
+remains a production follow-up recorded in ADR 0003.
 
 ### Membership and audit flow
 
@@ -290,9 +320,9 @@ Invoke-RestMethod -Method Get `
   -Headers $tenantHeaders
 ```
 
-The audit service also defines the safe interfaces used by later ticket creation,
-message, and status-transition integration. Repositories add rows but never commit
-independently; the business service owns the transaction.
+The audit service supplies safe factories used by membership and ticket
+mutations. Repositories add rows but never commit independently; the business
+service owns the transaction.
 
 ### Database migrations
 
@@ -366,6 +396,7 @@ The complete project plan is available in [SupportFlow_AI_Emir_Eray_Proje_Plani_
 - [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
 - [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)
 - [ADR 0003: Week 3 security, workflow, audit, and UI contracts](./docs/adr/0003-week-3-security-workflow-and-ui-contracts.md)
+- [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 
 The plan is a roadmap, not an implementation claim. This README will evolve as working features, tests, measurements, and known limitations are added.
 

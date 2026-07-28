@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Ticketlar · SupportFlow AI{% endblock %}
+{% block content %}
+<div class="stack">
+  <div class="row between">
+    <div class="stack" style="gap: 6px">
+      <h1>Ticketlar</h1>
+      <p class="muted">{{ context.organization.name }} için tenant-scope çalışma alanı</p>
+    </div>
+    <span class="badge">{{ context.membership.role.value }}</span>
+  </div>
+
+  <section class="card stack">
+    <h2>Filtreler</h2>
+    <form class="filters" method="get" action="/ui/tickets">
+      <label>
+        Status
+        <select name="status">
+          <option value="">Tümü</option>
+          {% for item in ticket_statuses %}
+          <option value="{{ item.value }}" {% if filters.status == item.value %}selected{% endif %}>{{ item.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Kaynak
+        <select name="source_type">
+          <option value="">Tümü</option>
+          {% for item in ticket_source_types %}
+          <option value="{{ item.value }}" {% if filters.source_type == item.value %}selected{% endif %}>{{ item.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Customer ID
+        <input name="customer_id" value="{{ filters.customer_id }}" placeholder="UUID">
+      </label>
+      <button type="submit">Uygula</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Konu</th>
+            <th>Status</th>
+            <th>Kaynak</th>
+            <th>Oluşturulma</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ticket in tickets %}
+          <tr>
+            <td><a href="/ui/tickets/{{ ticket.id }}">{{ ticket.subject }}</a></td>
+            <td><span class="badge">{{ ticket.status.value }}</span></td>
+            <td>{{ ticket.source_type.value }}</td>
+            <td>{{ ticket.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="muted">Bu filtrelerle eşleşen ticket bulunamadı.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="row between" style="margin-top: 18px">
+      <span class="muted">Toplam {{ pagination.total }} kayıt</span>
+      <div class="row">
+        {% if previous_url %}
+        <a class="button secondary small" href="{{ previous_url }}">Önceki</a>
+        {% endif %}
+        {% if next_url %}
+        <a class="button secondary small" href="{{ next_url }}">Sonraki</a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

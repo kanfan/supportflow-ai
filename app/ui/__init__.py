@@ -1,0 +1,1 @@
+"""Server-rendered agent workspace."""
