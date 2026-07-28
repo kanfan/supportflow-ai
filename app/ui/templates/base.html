@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SupportFlow AI{% endblock %}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #dce3ec;
+      --brand: #2457d6;
+      --brand-dark: #1742aa;
+      --danger: #b42318;
+      --success: #067647;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header {
+      background: #101828;
+      color: #fff;
+      padding: 14px 24px;
+    }
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { color: #fff; font-weight: 760; letter-spacing: -.02em; }
+    .brand:hover { text-decoration: none; }
+    .session { display: flex; align-items: center; gap: 14px; font-size: .9rem; }
+    .session small { color: #cbd5e1; }
+    main { max-width: 1120px; margin: 32px auto; padding: 0 20px 48px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(16, 24, 40, .06);
+      padding: 24px;
+    }
+    .stack { display: grid; gap: 18px; min-width: 0; }
+    .stack > * { min-width: 0; }
+    .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+    .between { justify-content: space-between; }
+    h1, h2, h3 { margin: 0; line-height: 1.2; }
+    h1 { font-size: clamp(1.65rem, 3vw, 2.25rem); }
+    h2 { font-size: 1.15rem; }
+    p { margin: 0; }
+    .muted { color: var(--muted); }
+    label { display: grid; gap: 7px; font-weight: 650; font-size: .9rem; }
+    input, select, textarea, button {
+      font: inherit;
+    }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #b8c2d1;
+      border-radius: 9px;
+      padding: 10px 12px;
+      color: var(--ink);
+      background: #fff;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+      outline: 3px solid rgba(36, 87, 214, .16);
+      border-color: var(--brand);
+    }
+    button, .button {
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 15px;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-block;
+    }
+    button:hover, .button:hover { background: var(--brand-dark); text-decoration: none; }
+    .button.secondary, button.secondary {
+      background: #eef2f7;
+      color: #344054;
+    }
+    .button.secondary:hover, button.secondary:hover { background: #e1e7ef; }
+    .button.small, button.small { padding: 7px 11px; font-size: .875rem; }
+    .error {
+      border: 1px solid #fda29b;
+      background: #fff1f0;
+      color: var(--danger);
+      border-radius: 9px;
+      padding: 11px 13px;
+    }
+    .badge {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: #eef4ff;
+      color: #3538cd;
+      font-size: .78rem;
+      font-weight: 750;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 13px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+    tr:last-child td { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+      gap: 12px;
+      align-items: end;
+    }
+    .timeline { display: grid; gap: 12px; }
+    .message {
+      border-left: 4px solid #84adff;
+      background: #f8faff;
+      border-radius: 0 10px 10px 0;
+      padding: 14px 16px;
+    }
+    .message-meta { color: var(--muted); font-size: .82rem; margin-bottom: 7px; }
+    .login-shell { max-width: 460px; margin: 8vh auto 0; }
+    @media (max-width: 760px) {
+      .filters { grid-template-columns: 1fr; }
+      header { padding-inline: 16px; }
+      .session small { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a class="brand" href="/ui/tickets">SupportFlow AI</a>
+      {% if context %}
+      <div class="session">
+        <small>{{ context.user.email }} · {{ context.organization.name }}</small>
+        <form method="post" action="/ui/logout">
+          <input type="hidden" name="csrf_token" value="{{ context.session.csrf_token }}">
+          <button class="secondary small" type="submit">Çıkış</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

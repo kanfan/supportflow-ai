@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}İşlem tamamlanamadı · SupportFlow AI{% endblock %}
+{% block content %}
+<section class="card stack" style="max-width: 620px; margin: 8vh auto 0">
+  <span class="badge" style="width:fit-content">Güvenli hata</span>
+  <h1>İşlem tamamlanamadı</h1>
+  <div class="error" role="alert">{{ message }}</div>
+  <div><a class="button secondary" href="/ui/tickets">Ticket listesine dön</a></div>
+</section>
+{% endblock %}

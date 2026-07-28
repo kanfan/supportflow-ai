@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     auth_issuer: str = "supportflow"
     auth_audience: str = "supportflow-api"
     access_token_ttl_minutes: int = Field(default=15, ge=1, le=1440)
+    ui_session_ttl_minutes: int = Field(default=480, ge=5, le=1440)
 
     @model_validator(mode="after")
     def reject_development_secret_outside_local_environments(self) -> "Settings":

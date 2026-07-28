@@ -192,7 +192,7 @@ def test_ticket_listing_and_customer_lookup_are_tenant_scoped(
             "subject": "Forged customer relationship",
             "customer_id": second_customer_id,
             "initial_message": {
-                "author_type": "customer",
+                "author_type": "agent",
                 "body": "This customer belongs to another tenant.",
             },
         },
@@ -416,6 +416,7 @@ def test_ticket_status_transitions_are_strict(
         service.transition_ticket(
             ticket_id=created.ticket.id,
             next_status=TicketStatus.RESOLVED,
+            current_user_id=user.id,
         )
 
     for expected_status in (
@@ -427,6 +428,7 @@ def test_ticket_status_transitions_are_strict(
         transitioned = service.transition_ticket(
             ticket_id=created.ticket.id,
             next_status=expected_status,
+            current_user_id=user.id,
         )
         assert transitioned.status is expected_status
 
@@ -434,4 +436,5 @@ def test_ticket_status_transitions_are_strict(
         service.transition_ticket(
             ticket_id=created.ticket.id,
             next_status=TicketStatus.OPEN,
+            current_user_id=user.id,
         )

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.subject }} · SupportFlow AI{% endblock %}
+{% block content %}
+<div class="stack">
+  <a href="/ui/tickets">← Ticket listesine dön</a>
+  <section class="card stack">
+    <div class="row between">
+      <div class="stack" style="gap: 7px">
+        <span class="muted">Ticket {{ ticket.id }}</span>
+        <h1>{{ ticket.subject }}</h1>
+      </div>
+      <span class="badge">{{ ticket.status.value }}</span>
+    </div>
+    <div class="row muted">
+      <span>Kaynak: {{ ticket.source_type.value }}</span>
+      <span>Customer: {{ ticket.customer_id or "—" }}</span>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <h2>Mesaj geçmişi</h2>
+    <div class="timeline">
+      {% for message in messages %}
+      <article class="message">
+        <div class="message-meta">
+          {{ message.author_type.value }} · {{ message.created_at.strftime("%Y-%m-%d %H:%M") }}
+        </div>
+        <div>{{ message.body }}</div>
+      </article>
+      {% else %}
+      <p class="muted">Henüz mesaj yok.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">
+    <section class="card stack">
+      <h2>Agent mesajı ekle</h2>
+      <form class="stack" method="post" action="/ui/tickets/{{ ticket.id }}/messages">
+        <input type="hidden" name="csrf_token" value="{{ context.session.csrf_token }}">
+        <label>
+          Mesaj
+          <textarea name="body" required maxlength="50000"></textarea>
+        </label>
+        <button type="submit">Mesajı kaydet</button>
+      </form>
+    </section>
+
+    <section class="card stack">
+      <h2>Status ilerlet</h2>
+      {% if next_status %}
+      <p class="muted">{{ ticket.status.value }} → {{ next_status.value }}</p>
+      <form method="post" action="/ui/tickets/{{ ticket.id }}/status">
+        <input type="hidden" name="csrf_token" value="{{ context.session.csrf_token }}">
+        <input type="hidden" name="status" value="{{ next_status.value }}">
+        <button type="submit">Status’u {{ next_status.value }} yap</button>
+      </form>
+      {% else %}
+      <p class="muted">Bu ticket kapalı; sonraki status bulunmuyor.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

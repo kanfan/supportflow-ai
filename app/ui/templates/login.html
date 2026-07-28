@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Giriş · SupportFlow AI{% endblock %}
+{% block content %}
+<section class="login-shell card stack">
+  <div class="stack" style="gap: 8px">
+    <span class="badge" style="width: fit-content">Agent workspace</span>
+    <h1>Destek akışına giriş yap</h1>
+    <p class="muted">Aktif üyeliğiniz bulunan organizasyonu seçerek devam edin.</p>
+  </div>
+  {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+  <form class="stack" method="post" action="/ui/login">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>
+      E-posta
+      <input type="email" name="email" autocomplete="username" required maxlength="320">
+    </label>
+    <label>
+      Parola
+      <input type="password" name="password" autocomplete="current-password" required maxlength="128">
+    </label>
+    <label>
+      Organizasyon kısa adı
+      <input name="organization_slug" autocomplete="organization" required maxlength="100" placeholder="ornegin-acme">
+    </label>
+    <button type="submit">Giriş yap</button>
+  </form>
+</section>
+{% endblock %}
