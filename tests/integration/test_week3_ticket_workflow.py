@@ -2,7 +2,7 @@ from collections.abc import Iterator
 import json
 import re
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 import pytest
@@ -12,10 +12,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from app.audit.models import AuditAction, AuditEvent
-from app.audit.repository import AuditEventRepository
 from app.config import Settings
 from app.main import create_app
-from app.tickets.models import Customer, Ticket, TicketMessage
+from app.tickets.models import Customer, Ticket, TicketMessage, TicketStatus
 from app.ui.session import UI_SESSION_COOKIE
 
 
@@ -272,14 +271,77 @@ def test_audit_failure_rolls_back_agent_message_and_status(
         headers=headers,
         subject="Message rollback",
     )
+    organization_id = UUID(registration["organization"]["id"])
+    ticket_id = UUID(ticket["id"])
 
-    def fail_audit_add(
-        _repository: AuditEventRepository,
-        _event: AuditEvent,
-    ) -> None:
+    with Session(database_engine) as session:
+        initial_message_count = session.scalar(
+            select(func.count())
+            .select_from(TicketMessage)
+            .where(TicketMessage.ticket_id == ticket_id)
+        )
+        initial_message_audit_count = session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.organization_id == organization_id,
+                AuditEvent.action == AuditAction.TICKET_MESSAGE_CREATED,
+            )
+        )
+        initial_status_audit_count = session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.organization_id == organization_id,
+                AuditEvent.action == AuditAction.TICKET_STATUS_CHANGED,
+            )
+        )
+    assert initial_message_count is not None
+    assert initial_message_audit_count is not None
+    assert initial_status_audit_count is not None
+
+    expected_operation = "message"
+    flushed_operations: list[str] = []
+
+    def flush_then_fail(session: Session) -> None:
+        session.flush()
+        if expected_operation == "message":
+            staged_message_count = session.scalar(
+                select(func.count())
+                .select_from(TicketMessage)
+                .where(
+                    TicketMessage.ticket_id == ticket_id,
+                    TicketMessage.body == "This message must roll back.",
+                )
+            )
+            staged_audit_count = session.scalar(
+                select(func.count())
+                .select_from(AuditEvent)
+                .where(
+                    AuditEvent.organization_id == organization_id,
+                    AuditEvent.action == AuditAction.TICKET_MESSAGE_CREATED,
+                )
+            )
+            assert staged_message_count == 1
+            assert staged_audit_count == initial_message_audit_count + 1
+        else:
+            staged_status = session.scalar(
+                select(Ticket.status).where(Ticket.id == ticket_id)
+            )
+            staged_audit_count = session.scalar(
+                select(func.count())
+                .select_from(AuditEvent)
+                .where(
+                    AuditEvent.organization_id == organization_id,
+                    AuditEvent.action == AuditAction.TICKET_STATUS_CHANGED,
+                )
+            )
+            assert staged_status is TicketStatus.PROCESSING
+            assert staged_audit_count == initial_status_audit_count + 1
+        flushed_operations.append(expected_operation)
         raise RuntimeError("forced ticket audit failure")
 
-    monkeypatch.setattr(AuditEventRepository, "add", fail_audit_add)
+    monkeypatch.setattr(Session, "commit", flush_then_fail)
     with pytest.raises(RuntimeError, match="forced ticket audit failure"):
         workflow_client.post(
             f"/api/v1/tickets/{ticket['id']}/messages",
@@ -291,15 +353,26 @@ def test_audit_failure_rolls_back_agent_message_and_status(
         message_count = session.scalar(
             select(func.count())
             .select_from(TicketMessage)
-            .where(TicketMessage.ticket_id == ticket["id"])
+            .where(TicketMessage.ticket_id == ticket_id)
         )
         ticket_status = session.scalar(
-            select(Ticket.status).where(Ticket.id == ticket["id"])
+            select(Ticket.status).where(Ticket.id == ticket_id)
         )
-    assert message_count == 1
+        message_audit_count = session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.organization_id == organization_id,
+                AuditEvent.action == AuditAction.TICKET_MESSAGE_CREATED,
+            )
+        )
+    assert flushed_operations == ["message"]
+    assert message_count == initial_message_count
+    assert message_audit_count == initial_message_audit_count
     assert ticket_status is not None
     assert ticket_status.value == "open"
 
+    expected_operation = "status"
     with pytest.raises(RuntimeError, match="forced ticket audit failure"):
         workflow_client.patch(
             f"/api/v1/tickets/{ticket['id']}/status",
@@ -309,10 +382,20 @@ def test_audit_failure_rolls_back_agent_message_and_status(
 
     with Session(database_engine) as session:
         rolled_back_status = session.scalar(
-            select(Ticket.status).where(Ticket.id == ticket["id"])
+            select(Ticket.status).where(Ticket.id == ticket_id)
         )
+        status_audit_count = session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.organization_id == organization_id,
+                AuditEvent.action == AuditAction.TICKET_STATUS_CHANGED,
+            )
+        )
+    assert flushed_operations == ["message", "status"]
     assert rolled_back_status is not None
     assert rolled_back_status.value == "open"
+    assert status_audit_count == initial_status_audit_count
 
 
 def test_agent_ui_session_csrf_tenant_workflow_and_logout_invalidation(
