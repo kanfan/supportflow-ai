@@ -67,10 +67,27 @@ readiness requirements.
   verified database context and IAM/task-role policy, never from an object-key
   prefix alone.
 
-### Network and IAM
+### Network, egress, and IAM
 
-- The ALB occupies public subnets.
-- ECS tasks, RDS, and ElastiCache occupy private subnets.
+- The ALB and NAT Gateway occupy public subnets.
+- ECS tasks occupy private application subnets and set
+  `assign_public_ip = false`.
+- RDS and ElastiCache occupy isolated data subnets whose route tables have no
+  default internet route.
+- The initial portfolio environment uses one NAT Gateway. Every private
+  application-subnet route table sends `0.0.0.0/0` to that NAT so API, worker,
+  and migration tasks can pull ECR images, publish CloudWatch logs, resolve
+  Secrets Manager values, and call external LLM/provider HTTPS APIs.
+- An S3 gateway endpoint is attached to the application route tables so
+  document traffic does not use the NAT Gateway.
+- One NAT is a deliberate cost/availability trade-off and a documented
+  single-AZ failure domain. Before the team claims high availability or keeps a
+  longer-lived environment, it provisions one NAT per application-subnet
+  Availability Zone and routes each subnet to its local NAT.
+- ECR, CloudWatch Logs, and Secrets Manager interface endpoints remain an
+  optional measured optimization; they are added only when traffic,
+  availability, and endpoint cost justify them. External providers still
+  require NAT egress.
 - The database accepts traffic only from the ECS task security group.
 - ElastiCache accepts traffic only from the ECS task security group.
 - ECS uses separate execution and application task roles.
@@ -127,8 +144,22 @@ normal production rollback mechanism.
 - CloudTrail records AWS control-plane activity.
 - Every resource is tagged with project, environment, owner, and cost-center
   values.
-- AWS Budgets is configured before the first persistent staging deployment,
-  with actual-cost alerts at agreed thresholds.
+- A USD 120 monthly AWS Budget is configured before the first persistent
+  staging deployment. Verified email/SNS subscriptions notify both Emir and
+  Eray at 50%, 80%, and 100% of actual spend and at 80% and 100% of forecast
+  spend.
+- At 50% the notification is informational. At 80% actual or forecast, the team
+  freezes new paid resources, reviews Cost Explorer and tags within 24 hours,
+  and destroys idle staging. At 100% actual or forecast, nonessential
+  deployments stop and disposable staging is destroyed within 24 hours unless
+  both owners record a time-bounded exception.
+- Budget data can be delayed and AWS Budgets is not a hard spending cap.
+- Staging and production-demo are not persistent simultaneously without a
+  milestone exception. Idle disposable environments are destroyed within 48
+  hours. Logs are retained for 14 days in staging and 30 days in
+  production-demo; only the current and previous ECR releases are retained;
+  noncurrent S3 versions expire after 30 days; temporary restore-test snapshots
+  expire within 7 days.
 
 ### Infrastructure as code
 
@@ -138,7 +169,8 @@ must not expose secrets and must not be committed to the repository.
 
 The first infrastructure modules cover:
 
-- VPC, subnets, routing, and security groups;
+- VPC, public ALB/NAT subnets, private application subnets, isolated data
+  subnets, route tables, the S3 gateway endpoint, and security groups;
 - ECR;
 - ECS cluster, API service, worker service, task definitions, and migration
   task;
@@ -149,7 +181,8 @@ The first infrastructure modules cover:
 - Secrets Manager references;
 - CloudWatch log groups, dashboards, and alarms;
 - GitHub OIDC provider/roles or their pre-provisioned equivalents;
-- budgets and mandatory tags.
+- the USD 120 budget, notification subscriptions, retention controls, and
+  mandatory tags.
 
 ## Timeline changes
 

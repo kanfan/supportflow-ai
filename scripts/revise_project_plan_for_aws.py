@@ -678,6 +678,7 @@ def revise_pdf(source: Path, output: Path) -> None:
     metadata.update(
         {
             "/Title": "SupportFlow AI - Uçtan Uca Proje Planı (AWS Revision 1.2)",
+            "/Author": "Emir and Eray",
             "/Subject": (
                 "12 haftalık AWS-aligned geliştirme, deployment, doğrulama ve "
                 "portföy planı"

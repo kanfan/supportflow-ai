@@ -74,8 +74,11 @@ Runtime and development dependencies are declared in `pyproject.toml` and resolv
 
 The API and Celery worker will use the same immutable image from Amazon ECR and
 run as separate ECS/Fargate services. Only the Application Load Balancer is
-public. ECS tasks, RDS, and ElastiCache remain in private subnets with
-security-group-to-security-group access. Uploaded documents use a private,
+public. ECS tasks have no public IP and use private application subnets with an
+initial single NAT Gateway for ECR, logging, secrets, and external-provider
+egress. RDS and ElastiCache use isolated data subnets, while private S3 access
+uses a gateway endpoint. This single-NAT design is a cost-conscious portfolio
+baseline, not a high-availability claim. Uploaded documents use a private,
 encrypted, versioned S3 bucket.
 
 GitHub Actions will obtain temporary AWS credentials through OIDC, build and

@@ -15,8 +15,9 @@ Application Load Balancer (public subnets)
 ECS/Fargate API service (private subnets)
    |--------- RDS PostgreSQL + pgvector (private)
    |--------- ElastiCache Valkey/Redis OSS (private, TLS)
-   |--------- S3 document bucket (private)
-   |--------- Secrets Manager
+   |--------- S3 gateway endpoint --> private S3 document bucket
+   |--------- NAT Gateway --> ECR, CloudWatch Logs, Secrets Manager
+   |                       \-> external LLM/provider HTTPS APIs
    |
 ECS/Fargate Celery worker (private subnets)
 
@@ -31,6 +32,22 @@ ECS stdout/stderr ------> CloudWatch Logs and alarms
 The API and worker always deploy the same image digest. Different commands make
 them separate runtime roles.
 
+ECS tasks use private application subnets with `assign_public_ip = false`.
+For the portfolio deployment, each application-subnet route table sends
+`0.0.0.0/0` to one NAT Gateway in a public subnet. This gives the API, worker,
+and migration task the outbound HTTPS path required for ECR image pulls,
+CloudWatch Logs, Secrets Manager, and external LLM/provider APIs. An S3 gateway
+endpoint keeps S3 traffic off the NAT path. RDS and ElastiCache use isolated
+data-subnet route tables with no default internet route.
+
+One NAT Gateway is an intentional, cost-conscious, non-high-availability
+starting point: its Availability Zone is a documented failure domain. Before
+claiming a highly available environment or running more than a short portfolio
+demo, provision one NAT Gateway per application-subnet Availability Zone and
+route each subnet to its local NAT. Interface endpoints for ECR, CloudWatch
+Logs, and Secrets Manager are a later measured optimization when their fixed
+cost is justified by NAT traffic and availability requirements.
+
 ## Phase 0: account and safety foundation
 
 Complete before persistent resources are provisioned:
@@ -39,7 +56,8 @@ Complete before persistent resources are provisioned:
 - [ ] Enable MFA for human administrator access.
 - [ ] Define least-privilege human, CI, execution, and task roles.
 - [ ] Configure project/environment/owner/cost tags.
-- [ ] Create actual-cost AWS Budget alerts.
+- [ ] Create the USD 120 monthly AWS Budget with the actual and forecast alerts
+      and response policy defined below.
 - [ ] Decide staging and production-demo DNS names.
 - [ ] Record the synthetic-data-only boundary.
 - [ ] Confirm that no real-data/KVKK claim is implied by the deployment.
@@ -48,8 +66,14 @@ Complete before persistent resources are provisioned:
 
 - [ ] Add remote-state design without committing state or secrets.
 - [ ] Create separate staging and production-demo state.
-- [ ] Provision VPC, public ALB subnets, private application/data subnets,
-      routing, and security groups.
+- [ ] Provision VPC, public ALB/NAT subnets, private application subnets, and
+      isolated data subnets across at least two Availability Zones.
+- [ ] Set `assign_public_ip = false` on ECS tasks and route each private
+      application subnet through the initial single NAT Gateway.
+- [ ] Add an S3 gateway endpoint to the application route tables; keep RDS and
+      ElastiCache data route tables without a default internet route.
+- [ ] Record the single-NAT failure domain and the per-AZ NAT upgrade gate in
+      Terraform outputs and the operations runbook.
 - [ ] Provision ECR and image-retention rules.
 - [ ] Provision ECS cluster and CloudWatch log groups.
 - [ ] Provision private RDS PostgreSQL and verify the required pgvector version.
@@ -156,10 +180,22 @@ Object recovery:
 AWS resources are not free merely because traffic is low. Persistent ALB, NAT,
 RDS, and ElastiCache resources can dominate idle cost. The team must:
 
-- create a budget before staging;
+- create a USD 120 monthly cost budget before staging;
+- notify both Emir and Eray through verified email/SNS subscriptions at 50%,
+  80%, and 100% of actual spend, and at 80% and 100% of forecast spend;
+- treat 50% as informational; at 80% actual or forecast, freeze new paid
+  resources, review Cost Explorer and mandatory tags within 24 hours, and
+  destroy idle staging resources; at 100% actual or forecast, stop nonessential
+  deployments and destroy disposable staging within 24 hours unless both owners
+  document a time-bounded exception;
+- remember that AWS Budgets data can be delayed and alerts are not a hard
+  spending cap; the owners remain responsible for checking Cost Explorer;
 - use the smallest measured configuration that meets the demo baseline;
 - avoid premature multi-AZ or autoscaling claims;
-- shut down or destroy disposable environments when a milestone does not
-  require them;
-- retain only the logs, snapshots, object versions, and images required by the
-  documented retention plan.
+- never keep staging and production-demo persistent simultaneously without a
+  documented milestone exception, and destroy an idle disposable environment
+  within 48 hours;
+- retain CloudWatch logs for 14 days in staging and 30 days in production-demo,
+  keep only the current and immediately previous ECR release images, expire
+  noncurrent S3 object versions after 30 days, and delete temporary database
+  restore-test snapshots within 7 days.
