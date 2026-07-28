@@ -91,10 +91,10 @@ tenant authorization, and the domain operation.
 
 | Operation | Median | p95 | SQL statements |
 | --- | ---: | ---: | ---: |
-| Filtered ticket list | 18.074 ms | 28.393 ms | 4 |
-| Ticket detail + 5 messages | 17.772 ms | 21.846 ms | 4 |
-| Agent message creation + audit | 21.402 ms | 30.685 ms | 5 |
-| Status transition + audit | 26.782 ms | 38.531 ms | 6 |
+| Filtered ticket list | 19.038 ms | 22.960 ms | 4 |
+| Ticket detail + 5 messages | 18.664 ms | 25.168 ms | 4 |
+| Agent message creation + audit | 21.594 ms | 30.499 ms | 5 |
+| Status transition + audit | 28.317 ms | 41.899 ms | 6 |
 
 The full raw result is
 [`week-3-performance-baseline.json`](./week-3-performance-baseline.json).

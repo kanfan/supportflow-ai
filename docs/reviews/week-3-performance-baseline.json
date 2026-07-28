@@ -1,5 +1,5 @@
 {
-  "commit": "178d278",
+  "commit": "9967fc7",
   "dataset": {
     "messages_before_measurement": 5000,
     "organizations": 2,
@@ -16,7 +16,7 @@
     "python": "3.13.3"
   },
   "interpretation_limit": "Local engineering baseline, not a production SLA or network/load test.",
-  "measured_at": "2026-07-28T19:56:52.466068+00:00",
+  "measured_at": "2026-07-28T20:04:52.959596+00:00",
   "method": {
     "latency_clock": "perf_counter_ns",
     "measured_iterations_per_operation": 40,
@@ -26,10 +26,10 @@
   "metrics": {
     "message_create": {
       "iterations": 40,
-      "max_ms": 37.584,
-      "median_ms": 21.402,
-      "min_ms": 19.359,
-      "p95_ms": 30.685,
+      "max_ms": 42.312,
+      "median_ms": 21.594,
+      "min_ms": 16.753,
+      "p95_ms": 30.499,
       "sql_statements": {
         "max": 5,
         "median": 5.0,
@@ -38,10 +38,10 @@
     },
     "status_transition": {
       "iterations": 40,
-      "max_ms": 86.037,
-      "median_ms": 26.782,
-      "min_ms": 22.104,
-      "p95_ms": 38.531,
+      "max_ms": 96.567,
+      "median_ms": 28.317,
+      "min_ms": 21.673,
+      "p95_ms": 41.899,
       "sql_statements": {
         "max": 6,
         "median": 6.0,
@@ -50,10 +50,10 @@
     },
     "ticket_detail": {
       "iterations": 40,
-      "max_ms": 33.363,
-      "median_ms": 17.772,
-      "min_ms": 14.434,
-      "p95_ms": 21.846,
+      "max_ms": 34.312,
+      "median_ms": 18.664,
+      "min_ms": 16.677,
+      "p95_ms": 25.168,
       "sql_statements": {
         "max": 4,
         "median": 4.0,
@@ -62,10 +62,10 @@
     },
     "ticket_list": {
       "iterations": 40,
-      "max_ms": 50.193,
-      "median_ms": 18.074,
-      "min_ms": 15.441,
-      "p95_ms": 28.393,
+      "max_ms": 28.46,
+      "median_ms": 19.038,
+      "min_ms": 17.76,
+      "p95_ms": 22.96,
       "sql_statements": {
         "max": 4,
         "median": 4.0,
@@ -75,21 +75,21 @@
   },
   "query_plans": {
     "ticket_detail": {
-      "execution_ms": 0.026,
+      "execution_ms": 0.029,
       "indexes": [
         "uq_tickets_organization_id_id"
       ],
       "nodes": [
         "Index Scan"
       ],
-      "planning_ms": 0.123,
+      "planning_ms": 0.087,
       "root_node": "Index Scan",
       "rows": 1,
       "shared_hit_blocks": 3,
       "shared_read_blocks": 0
     },
     "ticket_list": {
-      "execution_ms": 0.073,
+      "execution_ms": 0.076,
       "indexes": [
         "ix_tickets_organization_created_id"
       ],
@@ -97,14 +97,14 @@
         "Limit",
         "Index Scan"
       ],
-      "planning_ms": 0.341,
+      "planning_ms": 0.59,
       "root_node": "Limit",
       "rows": 20,
       "shared_hit_blocks": 115,
       "shared_read_blocks": 0
     },
     "ticket_messages": {
-      "execution_ms": 0.056,
+      "execution_ms": 0.038,
       "indexes": [
         "ix_ticket_messages_organization_ticket_created"
       ],
@@ -113,7 +113,7 @@
         "Bitmap Heap Scan",
         "Bitmap Index Scan"
       ],
-      "planning_ms": 0.298,
+      "planning_ms": 0.318,
       "root_node": "Sort",
       "rows": 5,
       "shared_hit_blocks": 3,
