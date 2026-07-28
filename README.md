@@ -65,9 +65,34 @@ Redis queue ------> Celery worker
 - pytest, Ruff, and Pyright
 - Docker and Docker Compose
 - GitHub Actions
-- Render for the portfolio deployment
+- AWS for the portfolio deployment: Amazon ECR, ECS on Fargate, an Application
+  Load Balancer, RDS for PostgreSQL with pgvector, ElastiCache, S3, Secrets
+  Manager, and CloudWatch
 
 Runtime and development dependencies are declared in `pyproject.toml` and resolved reproducibly through `uv.lock`.
+
+### AWS deployment target
+
+The API and Celery worker will use the same immutable image from Amazon ECR and
+run as separate ECS/Fargate services. Only the Application Load Balancer is
+public. ECS tasks have no public IP and use private application subnets with an
+initial single NAT Gateway for ECR, logging, secrets, and external-provider
+egress. RDS and ElastiCache use isolated data subnets, while private S3 access
+uses a gateway endpoint. This single-NAT design is a cost-conscious portfolio
+baseline, not a high-availability claim. Uploaded documents use a private,
+encrypted, versioned S3 bucket.
+
+GitHub Actions will obtain temporary AWS credentials through OIDC, build and
+push a commit-SHA image, run Alembic as a one-off ECS task, deploy the same image
+digest to the API and worker, wait for health, and run smoke tests. Secrets are
+resolved from AWS Secrets Manager; container logs and alarms use CloudWatch.
+
+The Week 3 process-local browser session store is not an AWS production
+boundary. Before multiple API tasks or restart-resilient sessions are enabled,
+session state must move to ElastiCache with TTLs and namespaced keys. The
+complete platform decision and phased implementation plan are documented in
+[ADR 0004](./docs/adr/0004-aws-deployment-platform.md) and the
+[AWS deployment plan](./docs/aws-deployment-plan.md).
 
 ## Current milestone: Week 3 security and workflow foundation
 
@@ -390,12 +415,15 @@ Install the Git hook once with `uv run pre-commit install`. GitHub Actions repea
 
 ## Documentation
 
-The complete project plan is available in [SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf](./SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf).
+The complete AWS-aligned project plan (revision 1.2) is available in
+[SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf](./SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf).
 
 - [API conventions](./docs/api-conventions.md)
 - [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
 - [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)
 - [ADR 0003: Week 3 security, workflow, audit, and UI contracts](./docs/adr/0003-week-3-security-workflow-and-ui-contracts.md)
+- [ADR 0004: AWS deployment platform](./docs/adr/0004-aws-deployment-platform.md)
+- [AWS deployment plan](./docs/aws-deployment-plan.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 
 The plan is a roadmap, not an implementation claim. This README will evolve as working features, tests, measurements, and known limitations are added.
