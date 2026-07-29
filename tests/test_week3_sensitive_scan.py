@@ -42,3 +42,26 @@ def test_sensitive_scan_detects_bearer_headers_and_jwts() -> None:
         "authorization_header",
         "jwt",
     }
+
+
+def test_release_log_scan_canaries_match_password_and_body_prefixes() -> None:
+    forbidden_values = (
+        "week3 demo password 2026",
+        "initial-body-",
+        "follow-up-body-",
+    )
+    text = "\n".join(
+        (
+            "week3 demo password 2026",
+            "initial-body-randomsuffix",
+            "follow-up-body-randomsuffix",
+        )
+    )
+
+    findings = scan_sensitive_text(text, forbidden_values=forbidden_values)
+
+    assert [finding.rule for finding in findings] == [
+        "forbidden_canary_1",
+        "forbidden_canary_2",
+        "forbidden_canary_3",
+    ]

@@ -6,6 +6,7 @@ import argparse
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from ipaddress import ip_address
 import json
 import math
 import os
@@ -44,13 +45,29 @@ def stable_uuid(name: str) -> UUID:
     return uuid5(NAMESPACE_URL, f"supportflow-week3-performance:{name}")
 
 
-def reset_schema(database_url: str) -> None:
-    database_name = make_url(database_url).database
+def validate_performance_database_url(database_url: str) -> None:
+    url = make_url(database_url)
+    database_name = url.database
     if database_name != PERF_DATABASE_NAME:
         raise RuntimeError(
             "Performance reset requires a disposable database named "
             f"{PERF_DATABASE_NAME}; received {database_name!r}"
         )
+    host = url.host
+    is_loopback = host is not None and host.casefold() == "localhost"
+    if host is not None and not is_loopback:
+        try:
+            is_loopback = ip_address(host).is_loopback
+        except ValueError:
+            is_loopback = False
+    if not is_loopback:
+        raise RuntimeError(
+            "Performance reset requires localhost or a loopback IP address"
+        )
+
+
+def reset_schema(database_url: str) -> None:
+    validate_performance_database_url(database_url)
     config = Config(PROJECT_ROOT / "alembic.ini")
     config.set_main_option("script_location", str(PROJECT_ROOT / "alembic"))
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))

@@ -13,7 +13,7 @@ Issue #22's release gate is reproducible and green on the measured branch:
 - all four expected membership/ticket audit actions were present and safe;
 - audit JSON plus API/worker container logs passed the credential, JWT, email,
   and exact-canary scan;
-- the complete suite passed with **90 automated tests**;
+- the complete suite passed with **96 automated tests**;
 - PostgreSQL, Redis, API, and Celery worker were healthy and the queue
   round-trip passed;
 - a fixed **1,000-ticket / 5,000-message** dataset produced a recorded local
@@ -73,8 +73,8 @@ bodies.
 `scripts/week3_sensitive_scan.py` reports rule names and line numbers without
 printing matched values. It detects bearer authorization headers, compact JWTs,
 email addresses, sensitive key/value pairs, and caller-supplied exact canaries.
-Three unit tests cover clean allowlisted audit metadata and each detection
-class.
+Four unit tests cover clean allowlisted audit metadata, each detection class,
+and the exact password/message-prefix values used by the release command.
 
 The live E2E scanned serialized audit responses for its password, three emails,
 three bearer tokens, and both message-body canaries. API and worker container
@@ -121,8 +121,9 @@ The full raw result is
   sanitized JSON evidence.
 - `scripts/week3_sensitive_scan.py` owns safe evidence/log scanning.
 - `scripts/week3_performance_baseline.py` safety-checks the exact disposable
-  database name, resets migrations, seeds deterministic data, measures HTTP
-  operations and SQL counts, and records `EXPLAIN (ANALYZE, BUFFERS)` summaries.
+  database name and a localhost/loopback host, resets migrations, seeds
+  deterministic data, measures HTTP operations and SQL counts, and records
+  `EXPLAIN (ANALYZE, BUFFERS)` summaries.
 - `tests/test_week3_sensitive_scan.py` prevents the scanner from silently
   accepting supported leak shapes.
 - The two JSON files preserve exact evidence without requiring claims to be
@@ -150,15 +151,52 @@ uv run python -m scripts.week3_performance_baseline `
 ```
 
 The performance runner refuses any database whose exact name is not
-`supportflow_perf`. The E2E runner expects an already migrated, clean API:
+`supportflow_perf` or whose host is not `localhost`/loopback.
+
+For the fresh E2E, use a separate disposable database. The following first
+terminal deletes only `supportflow_e2e` if it already exists, recreates and
+migrates it, then starts the API explicitly against that database:
+
+```powershell
+docker compose up --detach postgres
+docker compose exec postgres dropdb --if-exists --force `
+  --username supportflow supportflow_e2e
+docker compose exec postgres createdb `
+  --username supportflow supportflow_e2e
+
+$env:SUPPORTFLOW_DATABASE_URL = "postgresql+psycopg://supportflow:supportflow@127.0.0.1:5432/supportflow_e2e"
+$env:SUPPORTFLOW_AUTH_SECRET_KEY = "week3-e2e-secret-at-least-thirty-two-bytes"
+uv run alembic upgrade head
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 2>&1 |
+  Tee-Object -FilePath .week3-e2e-api.log
+```
+
+While that API remains running, use a second terminal:
 
 ```powershell
 uv run python -m scripts.week3_e2e `
-  --base-url http://127.0.0.1:8000 `
+  --base-url http://127.0.0.1:8001 `
   --output docs/reviews/week-3-e2e-evidence.json
+```
 
+Stop the API with `Ctrl+C`, then scan its captured output for the default
+password and both randomized message-canary prefixes:
+
+```powershell
+uv run python -m scripts.week3_sensitive_scan .week3-e2e-api.log `
+  --forbid "week3 demo password 2026" `
+  --forbid "initial-body-" `
+  --forbid "follow-up-body-"
+```
+
+The equivalent full-Compose API/worker log scan is:
+
+```powershell
 docker compose logs --no-color api worker |
-  uv run python -m scripts.week3_sensitive_scan
+  uv run python -m scripts.week3_sensitive_scan `
+    --forbid "week3 demo password 2026" `
+    --forbid "initial-body-" `
+    --forbid "follow-up-body-"
 ```
 
 The full Compose build, API health check, Alembic check, worker queue
