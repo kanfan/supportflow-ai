@@ -117,8 +117,8 @@ After this slice:
 
 - ADR/security contracts, membership/RBAC, audit foundation, ticket workflow,
   and authenticated agent UI are implemented.
-- Issue #22 remains the Week 3 release gate.
+- Issue #22 was the remaining Week 3 release gate at the time of this review.
 
-Issue #22 must still run the fresh-database admin-to-agent scenario, complete
-the joint threat model, scan logs/audit metadata for secrets and PII, and record
-the fixed-dataset median/p95 performance baseline plus query observations.
+The follow-up [Week 3 release verification](./week-3-verification.md) now records
+the fresh-database admin-to-agent scenario, joint threat model, log/audit
+sensitive-output scan, and fixed-dataset median/p95 performance baseline.

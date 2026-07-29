@@ -1,0 +1,29 @@
+{
+  "checks": {
+    "admin_adds_agent": "passed",
+    "agent_admin_surface_blocked": "passed",
+    "audit_actions_present": [
+      "organization_member.created",
+      "ticket.created",
+      "ticket.status_changed",
+      "ticket_message.created"
+    ],
+    "audit_sensitive_output_scan": "passed",
+    "author_impersonation_rejected": "passed",
+    "cross_tenant_id_matches_missing_404": "passed",
+    "health": "passed",
+    "invalid_transition_atomic": "passed",
+    "logout_replay_blocked": "passed",
+    "tenant_list_isolation": "passed",
+    "ui_message_and_status_workflow": "passed",
+    "ui_session_and_csrf_rotation": "passed",
+    "unsupported_upload_route_closed": "passed"
+  },
+  "completed_at": "2026-07-28T19:57:53.715296+00:00",
+  "counts": {
+    "tenant_a_audit_events": 5,
+    "tenant_a_visible_tickets": 1,
+    "ticket_messages_after_workflow": 2
+  },
+  "scenario": "fresh-db two-user/two-tenant API and UI workflow"
+}
