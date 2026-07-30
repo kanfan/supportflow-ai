@@ -27,12 +27,17 @@ class AuditAction(StrEnum):
     TICKET_CREATED = "ticket.created"
     TICKET_MESSAGE_CREATED = "ticket_message.created"
     TICKET_STATUS_CHANGED = "ticket.status_changed"
+    DOCUMENT_UPLOADED = "document.uploaded"
+    DOCUMENT_READY = "document.ready"
+    DOCUMENT_FAILED = "document.failed"
 
 
 class AuditResourceType(StrEnum):
     ORGANIZATION_MEMBER = "organization_member"
     TICKET = "ticket"
     TICKET_MESSAGE = "ticket_message"
+    DOCUMENT = "document"
+    DOCUMENT_VERSION = "document_version"
 
 
 class AuditEvent(UUIDPrimaryKeyMixin, Base):

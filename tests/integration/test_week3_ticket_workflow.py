@@ -537,6 +537,7 @@ def test_production_like_ui_cookie_is_secure(migrated_database_url: str) -> None
             auth_secret_key=SecretStr(TEST_AUTH_SECRET),
             auth_issuer="supportflow-week3-staging-test",
             auth_audience="supportflow-week3-staging-api",
+            document_scanner_mode="external",
         )
     )
     with TestClient(application, base_url="https://testserver") as client:

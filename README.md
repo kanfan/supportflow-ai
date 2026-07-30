@@ -7,8 +7,9 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > **Project status:** The foundation and core support backend are complete on
 > `main`: authentication, verified organization context, admin/agent membership
 > controls, tenant-scoped ticket workflows, append-only audit events, and a
-> minimal authenticated agent workspace. Document ingestion and AI/RAG remain
-> planned work.
+> minimal authenticated agent workspace. Week 4 adds the secure, tenant-scoped
+> document upload and version foundation; extraction, retry behavior, and AI/RAG
+> remain follow-up work.
 
 ## The problem
 
@@ -94,11 +95,12 @@ complete platform decision and phased implementation plan are documented in
 [ADR 0004](./docs/adr/0004-aws-deployment-platform.md) and the
 [AWS deployment plan](./docs/aws-deployment-plan.md).
 
-## Current milestone: Week 3 security and workflow foundation
+## Current milestone: Week 4 document ingestion
 
-The current `main` branch proves the local development foundation,
-authentication and role boundaries, organization isolation, atomic ticket/audit
-workflows, and the first server-rendered agent workspace.
+The current codebase proves the Week 1-3 application, security, ticket, audit,
+and agent-workspace foundations. Week 4 introduces private document storage,
+version-owned processing state, safe upload validation, and an ID-only boundary
+between the API and background worker.
 
 ### Acceptance criteria
 
@@ -114,7 +116,11 @@ workflows, and the first server-rendered agent workspace.
 - [x] Append-only audit events are integrated atomically with ticket mutations.
 - [x] The agent UI rotates server-side sessions and protects state-changing forms with CSRF tokens.
 - [x] Week 3 threat, fresh-DB E2E, sensitive-output, and fixed-dataset performance evidence is reproducible.
-- [ ] Document ingestion and AI/RAG are implemented.
+- [x] Admin document upload and status reads are tenant-scoped.
+- [x] PDF, UTF-8 text, and Markdown uploads are streamed, validated, and limited to 10 MiB.
+- [x] Document/version state uses private, S3-ready storage and ID-only task boundaries.
+- [ ] Reliable document extraction and retry processing are implemented.
+- [ ] AI/RAG is implemented.
 
 ## Initial ownership
 
@@ -349,6 +355,37 @@ Invoke-RestMethod -Method Get `
 The audit service supplies safe factories used by membership and ticket
 mutations. Repositories add rows but never commit independently; the business
 service owns the transaction.
+
+### Document upload foundation
+
+An authenticated organization `admin` can upload one PDF, UTF-8 text, or
+Markdown file with `POST /api/v1/documents`. The API streams the body into a
+bounded temporary file, enforces a 10 MiB limit, normalizes the display filename,
+checks the extension against the content, and never uses that filename as an
+object key.
+
+The object key is generated from tenant, document, and version UUIDs. Local
+development stores objects under the private `.supportflow/documents` directory;
+the `DocumentStorage` boundary allows AWS deployment to replace that adapter with
+private S3 without changing the service. Responses and logs omit object keys,
+hashes, document bodies, extracted text, and internal exception messages.
+
+After storage succeeds, the document, version `1`, and allowlisted
+`document.uploaded` audit event commit atomically. Only then does the API publish
+the version UUID to Celery. A broker failure leaves an inspectable `failed`
+version rather than falsely reporting a queued job. There is still a small crash
+window between the database commit and queue publication; ADR 0005 records an
+outbox or reconciler as a later reliability decision.
+
+Use the `Location` returned by a successful `202 Accepted` response with
+`GET /api/v1/documents/{document_id}`. Both routes are admin-only and use the
+verified `X-Organization-ID`; missing and cross-tenant identifiers return the
+same `404`.
+
+The scanner interface and fail-closed environment guard are present in this
+foundation. The fake scanner is allowed only for local/test environments. The
+worker-side extraction, real scanner adapter, retry/idempotency behavior, and
+status transitions are implemented separately under Issue #33.
 
 ### Database migrations
 

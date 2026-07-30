@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
@@ -32,6 +33,13 @@ class Settings(BaseSettings):
     auth_audience: str = "supportflow-api"
     access_token_ttl_minutes: int = Field(default=15, ge=1, le=1440)
     ui_session_ttl_minutes: int = Field(default=480, ge=5, le=1440)
+    document_storage_root: Path = Path(".supportflow/documents")
+    document_max_upload_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        ge=1,
+        le=10 * 1024 * 1024,
+    )
+    document_scanner_mode: Literal["fake", "external"] = "fake"
 
     @model_validator(mode="after")
     def reject_development_secret_outside_local_environments(self) -> "Settings":
@@ -41,6 +49,13 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "SUPPORTFLOW_AUTH_SECRET_KEY must be configured outside local/test"
+            )
+        if (
+            self.environment in {"staging", "production"}
+            and self.document_scanner_mode == "fake"
+        ):
+            raise ValueError(
+                "SUPPORTFLOW_DOCUMENT_SCANNER_MODE must not be fake outside local/test"
             )
         return self
 

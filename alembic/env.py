@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.audit import models as audit_models  # noqa: F401
 from app.config import get_settings
+from app.documents import models as document_models  # noqa: F401
 from app.identity import models as identity_models  # noqa: F401
 from app.infrastructure.database import Base
 from app.tickets import models as ticket_models  # noqa: F401

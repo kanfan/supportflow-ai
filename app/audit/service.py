@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.audit.models import AuditAction, AuditEvent, AuditResourceType
 from app.audit.repository import AuditEventPage, AuditEventRepository
+from app.documents.models import DocumentErrorCode, DocumentMediaType
 from app.identity.models import MembershipRole
 from app.tickets.models import TicketSourceType, TicketStatus
 
@@ -19,6 +20,12 @@ TICKET_SOURCE_TYPES: Final[frozenset[str]] = frozenset(
 )
 MEMBERSHIP_ROLES: Final[frozenset[str]] = frozenset(
     role.value for role in MembershipRole
+)
+DOCUMENT_MEDIA_TYPES: Final[frozenset[str]] = frozenset(
+    media_type.value for media_type in DocumentMediaType
+)
+DOCUMENT_ERROR_CODES: Final[frozenset[str]] = frozenset(
+    error_code.value for error_code in DocumentErrorCode
 )
 
 
@@ -113,6 +120,83 @@ class AuditEventService:
             },
         )
 
+    def record_document_uploaded(
+        self,
+        *,
+        actor_user_id: UUID,
+        document_id: UUID,
+        version_number: int,
+        media_type: StrEnum | str,
+        size_bytes: int,
+    ) -> AuditEvent:
+        media_type_value = enum_value(media_type)
+        if (
+            media_type_value not in DOCUMENT_MEDIA_TYPES
+            or version_number < 1
+            or size_bytes < 1
+        ):
+            raise AuditMetadataError("Unsupported document upload metadata")
+        return self._record(
+            action=AuditAction.DOCUMENT_UPLOADED,
+            actor_user_id=actor_user_id,
+            resource_type=AuditResourceType.DOCUMENT,
+            resource_id=document_id,
+            metadata={
+                "version_number": version_number,
+                "media_type": media_type_value,
+                "size_bytes": size_bytes,
+            },
+        )
+
+    def record_document_ready(
+        self,
+        *,
+        document_version_id: UUID,
+        version_number: int,
+        attempt_count: int,
+        extracted_character_count: int,
+    ) -> AuditEvent:
+        if version_number < 1 or attempt_count < 1 or extracted_character_count < 0:
+            raise AuditMetadataError("Unsupported document ready metadata")
+        return self._record(
+            action=AuditAction.DOCUMENT_READY,
+            actor_user_id=None,
+            resource_type=AuditResourceType.DOCUMENT_VERSION,
+            resource_id=document_version_id,
+            metadata={
+                "version_number": version_number,
+                "attempt_count": attempt_count,
+                "extracted_character_count": extracted_character_count,
+            },
+        )
+
+    def record_document_failed(
+        self,
+        *,
+        document_version_id: UUID,
+        version_number: int,
+        error_code: StrEnum | str,
+        attempt_count: int,
+    ) -> AuditEvent:
+        error_code_value = enum_value(error_code)
+        if (
+            error_code_value not in DOCUMENT_ERROR_CODES
+            or version_number < 1
+            or attempt_count < 0
+        ):
+            raise AuditMetadataError("Unsupported document failure metadata")
+        return self._record(
+            action=AuditAction.DOCUMENT_FAILED,
+            actor_user_id=None,
+            resource_type=AuditResourceType.DOCUMENT_VERSION,
+            resource_id=document_version_id,
+            metadata={
+                "version_number": version_number,
+                "error_code": error_code_value,
+                "attempt_count": attempt_count,
+            },
+        )
+
     def _record(
         self,
         *,
@@ -120,7 +204,7 @@ class AuditEventService:
         actor_user_id: UUID | None,
         resource_type: AuditResourceType,
         resource_id: UUID | None,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, str | int],
     ) -> AuditEvent:
         event = AuditEvent(
             organization_id=self._organization_id,
