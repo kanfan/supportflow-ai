@@ -424,6 +424,7 @@ The complete AWS-aligned project plan (revision 1.2) is available in
 - [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)
 - [ADR 0003: Week 3 security, workflow, audit, and UI contracts](./docs/adr/0003-week-3-security-workflow-and-ui-contracts.md)
 - [ADR 0004: AWS deployment platform](./docs/adr/0004-aws-deployment-platform.md)
+- [ADR 0005: Document ingestion and worker reliability contracts](./docs/adr/0005-document-ingestion-and-worker-reliability.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 - [Week 3 threat model](./docs/security/week-3-threat-model.md)
