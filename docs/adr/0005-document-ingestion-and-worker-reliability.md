@@ -1,6 +1,6 @@
 # ADR 0005: Document ingestion and worker reliability contracts
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-29
 - Tracks: #32 and #33
 - Prerequisite: Week 3 merged into `main` as `6a0db7c`
@@ -475,7 +475,11 @@ GitHub CI jobs must pass.
 
 ## Approval
 
-This ADR remains `Proposed` until Emir and Eray explicitly accept the model,
-upload/storage/scanner boundary, task state machine, retry/idempotency policy,
-and documented distributed-systems residual risk. Implementation branches may
-prepare independent code, but integration must not merge before acceptance.
+Emir proposed the contract in `ed974d1`. Eray reviewed that exact commit in PR
+#34 on 2026-07-29 and approved the model, upload/storage/scanner boundary, task
+state machine, retry/idempotency policy, safe logging rules, required evidence,
+and documented distributed-systems residual risk with no blocking findings.
+
+Both contributors therefore accept this ADR. Issues #32 and #33 must implement
+the accepted boundary; any material change requires an explicit ADR amendment
+and corresponding tests.
