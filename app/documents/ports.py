@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import BinaryIO, Protocol
+from typing import BinaryIO, Protocol, runtime_checkable
 from uuid import UUID
 
 
@@ -27,6 +27,7 @@ class DocumentScanResult(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
+@runtime_checkable
 class DocumentSafetyScanner(Protocol):
     """Worker-facing malware/safety boundary implemented fully in Issue #33."""
 

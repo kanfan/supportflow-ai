@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 import json
 import re
-from typing import Any
+from typing import Any, BinaryIO
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.audit.models import AuditAction, AuditEvent
 from app.config import Settings
+from app.documents.ports import DocumentScanResult
 from app.main import create_app
 from app.tickets.models import Customer, Ticket, TicketMessage, TicketStatus
 from app.ui.session import UI_SESSION_COOKIE
@@ -21,6 +22,12 @@ from app.ui.session import UI_SESSION_COOKIE
 pytestmark = pytest.mark.integration
 TEST_AUTH_SECRET = "week3-ticket-secret-with-at-least-thirty-two-bytes"
 PASSWORD = "correct horse battery staple"
+
+
+class StagingDocumentScanner:
+    def scan(self, source: BinaryIO) -> DocumentScanResult:
+        del source
+        return DocumentScanResult.CLEAN
 
 
 @pytest.fixture(scope="module")
@@ -538,7 +545,8 @@ def test_production_like_ui_cookie_is_secure(migrated_database_url: str) -> None
             auth_issuer="supportflow-week3-staging-test",
             auth_audience="supportflow-week3-staging-api",
             document_scanner_mode="external",
-        )
+        ),
+        document_safety_scanner=StagingDocumentScanner(),
     )
     with TestClient(application, base_url="https://testserver") as client:
         response = client.get("/ui/login")

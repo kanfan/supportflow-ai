@@ -12,8 +12,13 @@ from app.api.organization_members import router as organization_members_router
 from app.api.tickets import router as tickets_router
 from app.auth.security import AccessTokenManager, PasswordManager
 from app.config import Settings, get_settings
+from app.documents.composition import resolve_document_safety_scanner
 from app.documents.dispatch import CeleryDocumentTaskDispatcher
-from app.documents.ports import DocumentStorage, DocumentTaskDispatcher
+from app.documents.ports import (
+    DocumentSafetyScanner,
+    DocumentStorage,
+    DocumentTaskDispatcher,
+)
 from app.documents.storage import LocalDocumentStorage
 from app.errors import install_error_handlers
 from app.infrastructure.database import build_engine, build_session_factory
@@ -25,10 +30,15 @@ from app.worker import create_celery
 def create_app(
     settings: Settings | None = None,
     *,
+    document_safety_scanner: DocumentSafetyScanner | None = None,
     document_storage: DocumentStorage | None = None,
     document_task_dispatcher: DocumentTaskDispatcher | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
+    resolved_document_safety_scanner = resolve_document_safety_scanner(
+        resolved_settings,
+        document_safety_scanner,
+    )
     engine = build_engine(resolved_settings.database_url)
     session_factory = build_session_factory(engine)
 
@@ -45,6 +55,7 @@ def create_app(
     )
     application.state.settings = resolved_settings
     application.state.session_factory = session_factory
+    application.state.document_safety_scanner = resolved_document_safety_scanner
     application.state.document_storage = (
         document_storage
         if document_storage is not None

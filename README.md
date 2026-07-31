@@ -384,8 +384,10 @@ same `404`.
 
 The scanner interface and fail-closed environment guard are present in this
 foundation. The fake scanner is allowed only for local/test environments. The
-worker-side extraction, real scanner adapter, retry/idempotency behavior, and
-status transitions are implemented separately under Issue #33.
+`external` configuration label alone is not sufficient: staging/production
+startup requires a concrete non-fake scanner adapter. The worker-side
+extraction, real adapter construction, retry/idempotency behavior, and status
+transitions are implemented separately under Issue #33.
 
 ### Database migrations
 

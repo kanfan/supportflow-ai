@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from hashlib import sha256
+import logging
 from typing import Any, BinaryIO
 from uuid import UUID, uuid4
 
@@ -38,6 +39,7 @@ from app.main import create_app
 pytestmark = pytest.mark.integration
 TEST_AUTH_SECRET = "document-integration-secret-with-thirty-two-bytes"
 PASSWORD = "correct horse battery staple"
+ORIGINAL_RECORD_DOCUMENT_UPLOADED = AuditEventService.record_document_uploaded
 
 
 @dataclass
@@ -340,10 +342,31 @@ def test_upload_rejects_extra_multipart_fields_and_invalid_content(
         content=b"unsafe\x00binary",
         content_type="text/plain",
     )
+    pdf_as_text = upload(
+        document_harness,
+        token=token,
+        organization_id=organization_id,
+        filename="manual.txt",
+        content=b"%PDF-1.7\nPDF disguised as text",
+        content_type="text/plain",
+    )
+    pdf_as_markdown = upload(
+        document_harness,
+        token=token,
+        organization_id=organization_id,
+        filename="manual.md",
+        content=b"%PDF-1.7\nPDF disguised as Markdown",
+        content_type="text/markdown",
+    )
 
     assert extra_field.status_code == 422
     assert extra_field.json()["error"]["code"] == "invalid_document_form"
-    for response in (wrong_pdf, binary_text):
+    for response in (
+        wrong_pdf,
+        binary_text,
+        pdf_as_text,
+        pdf_as_markdown,
+    ):
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "unsupported_document_type"
 
@@ -388,10 +411,39 @@ class FailingPutStorage(InMemoryDocumentStorage):
         raise RuntimeError("private storage unavailable")
 
 
+class FailingDeleteStorage(InMemoryDocumentStorage):
+    def delete(self, key: str) -> None:
+        del key
+        raise RuntimeError("cleanup implementation detail")
+
+
+def add_database_invalid_upload_audit(
+    service: AuditEventService,
+    *,
+    actor_user_id: UUID,
+    document_id: UUID,
+    version_number: int,
+    media_type: DocumentMediaType,
+    size_bytes: int,
+) -> AuditEvent:
+    event = ORIGINAL_RECORD_DOCUMENT_UPLOADED(
+        service,
+        actor_user_id=actor_user_id,
+        document_id=document_id,
+        version_number=version_number,
+        media_type=media_type,
+        size_bytes=size_bytes,
+    )
+    event.action = "invalid_without_required_dot"
+    return event
+
+
 def test_storage_failure_creates_no_database_or_queue_state(
     document_harness: DocumentHarness,
     database_engine: Engine,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.WARNING, logger="app.documents.service")
     registration, token = register_and_login(
         document_harness.client,
         f"document-storage-fail-{uuid4().hex}",
@@ -407,6 +459,9 @@ def test_storage_failure_creates_no_database_or_queue_state(
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "document_storage_unavailable"
     assert document_harness.dispatcher.dispatched == []
+    assert "error_category=storage_unavailable" in caplog.text
+    assert "RuntimeError" not in caplog.text
+    assert "private storage unavailable" not in caplog.text
     with Session(database_engine) as session:
         assert session.scalar(select(func.count()).select_from(Document)) == 0
         assert session.scalar(select(func.count()).select_from(DocumentVersion)) == 0
@@ -421,32 +476,11 @@ def test_database_commit_failure_after_storage_put_cleans_up_everything(
         document_harness.client,
         f"document-db-fail-{uuid4().hex}",
     )
-    original_record_document_uploaded = AuditEventService.record_document_uploaded
-
-    def add_database_invalid_audit(
-        service: AuditEventService,
-        *,
-        actor_user_id: UUID,
-        document_id: UUID,
-        version_number: int,
-        media_type: DocumentMediaType,
-        size_bytes: int,
-    ) -> AuditEvent:
-        event = original_record_document_uploaded(
-            service,
-            actor_user_id=actor_user_id,
-            document_id=document_id,
-            version_number=version_number,
-            media_type=media_type,
-            size_bytes=size_bytes,
-        )
-        event.action = "invalid_without_required_dot"
-        return event
 
     monkeypatch.setattr(
         AuditEventService,
         "record_document_uploaded",
-        add_database_invalid_audit,
+        add_database_invalid_upload_audit,
     )
     response = upload(
         document_harness,
@@ -471,11 +505,55 @@ def test_database_commit_failure_after_storage_put_cleans_up_everything(
         )
 
 
+def test_cleanup_failure_uses_safe_stable_log_category(
+    document_harness: DocumentHarness,
+    database_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="app.documents.service")
+    registration, token = register_and_login(
+        document_harness.client,
+        f"document-cleanup-fail-{uuid4().hex}",
+    )
+    storage = FailingDeleteStorage()
+    document_harness.client.app.state.document_storage = storage
+    monkeypatch.setattr(
+        AuditEventService,
+        "record_document_uploaded",
+        add_database_invalid_upload_audit,
+    )
+
+    content = b"cleanup-secret-content"
+    filename = "cleanup-secret-filename.txt"
+    response = upload(
+        document_harness,
+        token=token,
+        organization_id=registration["organization"]["id"],
+        filename=filename,
+        content=content,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "document_persistence_failed"
+    assert len(storage.objects) == 1
+    assert "error_category=storage_cleanup_failed" in caplog.text
+    assert "RuntimeError" not in caplog.text
+    assert "cleanup implementation detail" not in caplog.text
+    assert filename not in caplog.text
+    assert content.decode() not in caplog.text
+    assert next(iter(storage.objects)) not in caplog.text
+    with Session(database_engine) as session:
+        assert session.scalar(select(func.count()).select_from(Document)) == 0
+        assert session.scalar(select(func.count()).select_from(DocumentVersion)) == 0
+
+
 def test_dispatch_failure_becomes_safe_inspectable_failed_state(
     document_harness: DocumentHarness,
     database_engine: Engine,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.WARNING, logger="app.documents.service")
     registration, token = register_and_login(
         document_harness.client,
         f"document-dispatch-fail-{uuid4().hex}",
@@ -534,6 +612,9 @@ def test_dispatch_failure_becomes_safe_inspectable_failed_state(
     assert filename not in caplog.text
     assert content.decode() not in caplog.text
     assert version.storage_key not in caplog.text
+    assert "error_category=dispatch_failed" in caplog.text
+    assert "RuntimeError" not in caplog.text
+    assert "broker failure with raw internal detail" not in caplog.text
 
 
 def test_database_enforces_document_tenant_and_version_constraints(

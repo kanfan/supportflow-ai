@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 import logging
 from typing import BinaryIO
 from uuid import UUID, uuid4
@@ -21,6 +22,13 @@ from app.documents.validation import stage_document_upload
 
 
 logger = logging.getLogger(__name__)
+
+
+class DocumentLogCategory(StrEnum):
+    STORAGE_UNAVAILABLE = "storage_unavailable"
+    STORAGE_CLEANUP_FAILED = "storage_cleanup_failed"
+    DISPATCH_FAILED = "dispatch_failed"
+    DISPATCH_COMPENSATION_FAILED = "dispatch_compensation_failed"
 
 
 class DocumentNotFoundError(LookupError):
@@ -108,7 +116,7 @@ class DocumentService:
                     self._organization_id,
                     document_id,
                     version_id,
-                    type(exc).__name__,
+                    DocumentLogCategory.STORAGE_UNAVAILABLE,
                 )
                 raise DocumentStorageUnavailableError from exc
 
@@ -161,7 +169,7 @@ class DocumentService:
                     self._organization_id,
                     document_id,
                     version_id,
-                    type(exc).__name__,
+                    DocumentLogCategory.DISPATCH_FAILED,
                 )
                 self._record_dispatch_failure(
                     document=document,
@@ -188,14 +196,14 @@ class DocumentService:
     ) -> None:
         try:
             self._storage.delete(storage_key)
-        except Exception as exc:
+        except Exception:
             logger.warning(
                 "document_storage_cleanup_failed organization_id=%s "
                 "document_id=%s version_id=%s error_category=%s",
                 self._organization_id,
                 document_id,
                 version_id,
-                type(exc).__name__,
+                DocumentLogCategory.STORAGE_CLEANUP_FAILED,
             )
 
     def _record_dispatch_failure(
@@ -218,9 +226,10 @@ class DocumentService:
             self._session.rollback()
             logger.error(
                 "document_dispatch_compensation_failed organization_id=%s "
-                "document_id=%s version_id=%s",
+                "document_id=%s version_id=%s error_category=%s",
                 self._organization_id,
                 document.id,
                 version.id,
+                DocumentLogCategory.DISPATCH_COMPENSATION_FAILED,
             )
             raise

@@ -93,6 +93,9 @@ def _validate_content(media_type: DocumentMediaType, content: BinaryIO) -> None:
             raise UnsupportedDocumentTypeError
         return
 
+    if prefix == b"%PDF-":
+        raise UnsupportedDocumentTypeError
+
     payload = content.read()
     content.seek(0)
     if b"\x00" in payload:

@@ -1,11 +1,23 @@
 from io import BytesIO
+from pathlib import Path
+from typing import BinaryIO
 
 import pytest
+from pydantic import SecretStr
 
+from app.config import Settings
+from app.documents.composition import DocumentScannerConfigurationError
 from app.documents.ports import (
     DocumentScanResult,
     FakeDocumentSafetyScanner,
 )
+from app.main import create_app
+
+
+class ConfiguredExternalScanner:
+    def scan(self, source: BinaryIO) -> DocumentScanResult:
+        del source
+        return DocumentScanResult.CLEAN
 
 
 @pytest.mark.parametrize("result", list(DocumentScanResult))
@@ -15,3 +27,44 @@ def test_fake_scanner_returns_the_configured_deterministic_result(
     scanner = FakeDocumentSafetyScanner(result)
 
     assert scanner.scan(BytesIO(b"untrusted fixture")) is result
+
+
+def production_settings(storage_root: Path) -> Settings:
+    return Settings(
+        environment="production",
+        auth_secret_key=SecretStr("x" * 32),
+        document_scanner_mode="external",
+        document_storage_root=storage_root,
+    )
+
+
+def test_production_cannot_boot_with_only_external_mode_label(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        DocumentScannerConfigurationError,
+        match="requires a configured scanner adapter",
+    ):
+        create_app(production_settings(tmp_path))
+
+
+def test_production_rejects_injected_fake_scanner(tmp_path: Path) -> None:
+    with pytest.raises(
+        DocumentScannerConfigurationError,
+        match="cannot use the fake scanner",
+    ):
+        create_app(
+            production_settings(tmp_path),
+            document_safety_scanner=FakeDocumentSafetyScanner(),
+        )
+
+
+def test_production_accepts_concrete_external_scanner(tmp_path: Path) -> None:
+    scanner = ConfiguredExternalScanner()
+
+    application = create_app(
+        production_settings(tmp_path),
+        document_safety_scanner=scanner,
+    )
+
+    assert application.state.document_safety_scanner is scanner
