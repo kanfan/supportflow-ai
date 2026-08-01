@@ -7,9 +7,9 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > **Project status:** The foundation and core support backend are complete on
 > `main`: authentication, verified organization context, admin/agent membership
 > controls, tenant-scoped ticket workflows, append-only audit events, and a
-> minimal authenticated agent workspace. Week 4 adds the secure, tenant-scoped
-> document upload and version foundation; extraction, retry behavior, and AI/RAG
-> remain follow-up work.
+> minimal authenticated agent workspace. Week 4 adds secure tenant-scoped
+> document uploads plus retry-safe PDF/TXT/Markdown ingestion. AI/RAG remains
+> follow-up work.
 
 ## The problem
 
@@ -119,7 +119,9 @@ between the API and background worker.
 - [x] Admin document upload and status reads are tenant-scoped.
 - [x] PDF, UTF-8 text, and Markdown uploads are streamed, validated, and limited to 10 MiB.
 - [x] Document/version state uses private, S3-ready storage and ID-only task boundaries.
-- [ ] Reliable document extraction and retry processing are implemented.
+- [x] Reliable PDF/TXT/Markdown extraction and retry processing are implemented.
+- [x] Duplicate/redelivered document tasks converge on one terminal result and audit event.
+- [x] API and worker containers share a private storage volume for local ingestion.
 - [ ] AI/RAG is implemented.
 
 ## Initial ownership
@@ -196,7 +198,14 @@ Verify that a task travels through Redis, runs on the worker, and returns its re
 
 ```powershell
 docker compose run --rm api python -m scripts.smoke_worker
+docker compose run --rm api python -m scripts.smoke_document_ingestion
 ```
+
+The document smoke creates a synthetic tenant, uploads a Markdown document,
+waits for `queued -> extracting -> ready`, delivers the same version task twice
+to prove a no-op terminal result, and verifies that a corrupt PDF reaches only a
+safe `failed` response. PDF extraction uses `pypdf`; raw files and extracted text
+remain outside task arguments, Celery results, audit metadata, and logs.
 
 Inspect logs or stop the stack:
 

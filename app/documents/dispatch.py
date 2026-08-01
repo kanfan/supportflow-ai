@@ -2,8 +2,7 @@ from uuid import UUID
 
 from celery import Celery
 
-
-INGEST_DOCUMENT_VERSION_TASK = "supportflow.documents.ingest"
+from app.documents.ingestion import INGEST_DOCUMENT_VERSION_TASK
 
 
 class CeleryDocumentTaskDispatcher:

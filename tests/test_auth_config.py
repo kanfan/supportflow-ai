@@ -25,3 +25,12 @@ def test_deployed_environment_rejects_fake_document_scanner() -> None:
             environment="staging",
             auth_secret_key=SecretStr("x" * 32),
         )
+
+
+def test_document_worker_hard_limit_must_exceed_soft_limit() -> None:
+    with pytest.raises(ValidationError, match="hard time limit"):
+        Settings(
+            environment="test",
+            document_ingestion_soft_time_limit_seconds=60,
+            document_ingestion_hard_time_limit_seconds=60,
+        )

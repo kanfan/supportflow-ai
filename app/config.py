@@ -40,6 +40,23 @@ class Settings(BaseSettings):
         le=10 * 1024 * 1024,
     )
     document_scanner_mode: Literal["fake", "external"] = "fake"
+    document_max_pdf_pages: int = Field(default=250, ge=1, le=1000)
+    document_max_extracted_characters: int = Field(
+        default=2_000_000,
+        ge=1,
+        le=10_000_000,
+    )
+    document_ingestion_max_retries: int = Field(default=3, ge=0, le=10)
+    document_ingestion_soft_time_limit_seconds: int = Field(
+        default=60,
+        ge=1,
+        le=600,
+    )
+    document_ingestion_hard_time_limit_seconds: int = Field(
+        default=75,
+        ge=2,
+        le=900,
+    )
 
     @model_validator(mode="after")
     def reject_development_secret_outside_local_environments(self) -> "Settings":
@@ -56,6 +73,13 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "SUPPORTFLOW_DOCUMENT_SCANNER_MODE must not be fake outside local/test"
+            )
+        if (
+            self.document_ingestion_hard_time_limit_seconds
+            <= self.document_ingestion_soft_time_limit_seconds
+        ):
+            raise ValueError(
+                "Document ingestion hard time limit must exceed the soft time limit"
             )
         return self
 

@@ -372,6 +372,12 @@ it does not execute HTML, scripts, macros, or remote references.
 Extraction runs only in the worker, never inside the upload request. No chunks or
 embeddings are created in Week 4.
 
+Implementation outcome: Issue #33 selected `pypdf` 6.x for the PDF adapter. It
+supports Python 3.13, is typed and pure Python, and uses the BSD-3-Clause license.
+The adapter runs in strict mode, rejects encrypted/corrupt input, applies the
+250-page limit before page extraction, and checks the cumulative character bound
+after every page. OCR remains deferred.
+
 ### Audit and logging
 
 Week 4 extends the audit vocabulary:

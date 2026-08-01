@@ -52,6 +52,7 @@ class DocumentErrorCode(StrEnum):
     EXTRACTION_FAILED = "extraction_failed"
     EXTRACTION_LIMIT_EXCEEDED = "extraction_limit_exceeded"
     RETRY_EXHAUSTED = "retry_exhausted"
+    DATABASE_UNAVAILABLE = "database_unavailable"
 
 
 document_source_type = Enum(
