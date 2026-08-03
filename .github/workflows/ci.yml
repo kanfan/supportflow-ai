@@ -100,6 +100,15 @@ jobs:
       - name: Check document ingestion round trip
         run: docker compose run --rm api python -m scripts.smoke_document_ingestion
 
+      - name: Check claimed-job worker-loss redelivery
+        run: |
+          docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery prepare
+          docker compose -f compose.yaml -f compose.worker-loss.yaml kill --signal SIGKILL worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery release
+          docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery verify
+
       - name: Show service logs on failure
         if: failure()
         run: docker compose logs --no-color

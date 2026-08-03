@@ -207,6 +207,13 @@ to prove a no-op terminal result, and verifies that a corrupt PDF reaches only a
 safe `failed` response. PDF extraction uses `pypdf`; raw files and extracted text
 remain outside task arguments, Celery results, audit metadata, and logs.
 
+CI also runs a claimed-job crash test: it blocks the local/test scanner after the
+database row reaches `extracting`, kills the worker container, then verifies that
+Redis redelivers the unacknowledged task after restart without changing the
+attempt count or creating another result/audit event. The dedicated
+`compose.worker-loss.yaml` override is smoke-only and cannot be enabled in
+staging/production scanner mode.
+
 Inspect logs or stop the stack:
 
 ```powershell

@@ -44,6 +44,7 @@ from app.infrastructure.database import build_session_factory
 pytestmark = pytest.mark.integration
 TEST_AUTH_SECRET = "ingestion-integration-secret-with-thirty-two-bytes"
 ORIGINAL_RECORD_DOCUMENT_READY = AuditEventService.record_document_ready
+ORIGINAL_RECORD_DOCUMENT_FAILED = AuditEventService.record_document_failed
 
 
 def blank_pdf() -> bytes:
@@ -243,6 +244,48 @@ class SequenceScanner(FakeDocumentSafetyScanner):
         result = self.results[min(self.calls, len(self.results) - 1)]
         self.calls += 1
         return result
+
+
+class RetryStateRecordingService(DocumentIngestionService):
+    def __init__(
+        self,
+        engine: Engine,
+        storage: InMemoryDocumentStorage,
+        scanner: SequenceScanner,
+    ) -> None:
+        super().__init__(
+            build_session_factory(engine),
+            storage=storage,
+            scanner=scanner,
+            extractors=DocumentExtractorRegistry(),
+            limits=ExtractionLimits(
+                max_pdf_pages=250,
+                max_characters=2_000_000,
+            ),
+        )
+        self._engine = engine
+        self.released_states: list[
+            tuple[DocumentProcessingStatus, int, str | None, str | None]
+        ] = []
+
+    def prepare_retry(
+        self,
+        version_id: UUID,
+        task_id: str,
+        error_code: DocumentErrorCode,
+    ) -> None:
+        super().prepare_retry(version_id, task_id, error_code)
+        with Session(self._engine) as session:
+            version = session.get(DocumentVersion, version_id)
+            assert version is not None
+            self.released_states.append(
+                (
+                    version.status,
+                    version.attempt_count,
+                    version.processing_task_id,
+                    version.error_code,
+                )
+            )
 
 
 def test_concurrent_duplicate_cannot_take_an_active_claim(
@@ -503,20 +546,21 @@ def test_infected_document_fails_without_parsing_or_retry(
 
 def test_retry_exhaustion_via_celery_task_reaches_safe_failed_state(
     database_engine: Engine,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    caplog.set_level(logging.WARNING, logger="app.documents.tasks")
     storage = InMemoryDocumentStorage()
     persisted = create_queued_version(database_engine, storage)
-    application = Celery("exhausted-ingestion-test", broker="memory://")
-    service = ingestion_service(
-        database_engine,
-        storage,
-        scanner=FakeDocumentSafetyScanner(DocumentScanResult.UNAVAILABLE),
+    scanner = SequenceScanner(
+        [DocumentScanResult.UNAVAILABLE, DocumentScanResult.UNAVAILABLE]
     )
+    application = Celery("exhausted-ingestion-test", broker="memory://")
+    service = RetryStateRecordingService(database_engine, storage, scanner)
     task_name = f"supportflow.documents.ingest.exhausted.{uuid4().hex}"
     task = register_document_ingestion_task(
         application,
         service,
-        max_retries=0,
+        max_retries=1,
         soft_time_limit=60,
         hard_time_limit=75,
         task_name=task_name,
@@ -537,10 +581,21 @@ def test_retry_exhaustion_via_celery_task_reaches_safe_failed_state(
         )
     assert result.successful()
     assert result.result is None
+    assert scanner.calls == 2
     assert version is not None
     assert version.status is DocumentProcessingStatus.FAILED
     assert version.error_code == DocumentErrorCode.RETRY_EXHAUSTED.value
-    assert version.attempt_count == 1
+    assert version.attempt_count == 2
+    assert version.processing_task_id is None
+    assert service.released_states == [
+        (
+            DocumentProcessingStatus.QUEUED,
+            1,
+            None,
+            DocumentErrorCode.SCANNER_UNAVAILABLE.value,
+        )
+    ]
+    assert caplog.text.count("document_ingestion_retry") == 1
     assert failed_event_count == 1
 
 
@@ -558,6 +613,25 @@ def invalid_ready_audit(
         version_number=version_number,
         attempt_count=attempt_count,
         extracted_character_count=extracted_character_count,
+    )
+    event.action = "invalid_without_required_dot"
+    return event
+
+
+def invalid_failed_audit(
+    service: AuditEventService,
+    *,
+    document_version_id: UUID,
+    version_number: int,
+    error_code: DocumentErrorCode,
+    attempt_count: int,
+) -> AuditEvent:
+    event = ORIGINAL_RECORD_DOCUMENT_FAILED(
+        service,
+        document_version_id=document_version_id,
+        version_number=version_number,
+        error_code=error_code,
+        attempt_count=attempt_count,
     )
     event.action = "invalid_without_required_dot"
     return event
@@ -592,6 +666,44 @@ def test_terminal_state_rolls_back_when_audit_commit_fails(
     assert version.extracted_text is None
     assert version.processing_task_id == "atomic-delivery"
     assert ready_event_count == 0
+
+
+def test_failed_state_rolls_back_when_failed_audit_commit_fails(
+    database_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage = InMemoryDocumentStorage()
+    persisted = create_queued_version(
+        database_engine,
+        storage,
+        media_type=DocumentMediaType.PDF,
+        content=b"%PDF-corrupt-failed-audit",
+    )
+    service = ingestion_service(database_engine, storage)
+    monkeypatch.setattr(
+        AuditEventService,
+        "record_document_failed",
+        invalid_failed_audit,
+    )
+
+    with pytest.raises(RetryableIngestionError) as captured:
+        service.process(persisted.version_id, "failed-atomic-delivery")
+
+    with Session(database_engine) as session:
+        version = session.get(DocumentVersion, persisted.version_id)
+        failed_event_count = session.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(AuditEvent.action == AuditAction.DOCUMENT_FAILED.value)
+        )
+    assert captured.value.error_code is DocumentErrorCode.DATABASE_UNAVAILABLE
+    assert version is not None
+    assert version.status is DocumentProcessingStatus.EXTRACTING
+    assert version.extracted_text is None
+    assert version.error_code is None
+    assert version.attempt_count == 1
+    assert version.processing_task_id == "failed-atomic-delivery"
+    assert failed_event_count == 0
 
 
 def test_worker_logs_exclude_document_content_and_storage_details(

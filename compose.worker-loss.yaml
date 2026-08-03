@@ -1,0 +1,6 @@
+services:
+  worker:
+    environment:
+      SUPPORTFLOW_DOCUMENT_FAKE_SCANNER_GATE_PATH: /app/.supportflow/documents/.worker-redelivery-release
+      SUPPORTFLOW_DOCUMENT_FAKE_SCANNER_GATE_TIMEOUT_SECONDS: 120
+      SUPPORTFLOW_CELERY_VISIBILITY_TIMEOUT_SECONDS: 5

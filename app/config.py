@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend_url: str = "redis://localhost:6379/1"
+    celery_visibility_timeout_seconds: int = Field(
+        default=180,
+        ge=5,
+        le=86_400,
+    )
     auth_secret_key: SecretStr = SecretStr(DEVELOPMENT_AUTH_SECRET)
     auth_issuer: str = "supportflow"
     auth_audience: str = "supportflow-api"
@@ -40,6 +45,12 @@ class Settings(BaseSettings):
         le=10 * 1024 * 1024,
     )
     document_scanner_mode: Literal["fake", "external"] = "fake"
+    document_fake_scanner_gate_path: Path | None = None
+    document_fake_scanner_gate_timeout_seconds: int = Field(
+        default=120,
+        ge=1,
+        le=300,
+    )
     document_max_pdf_pages: int = Field(default=250, ge=1, le=1000)
     document_max_extracted_characters: int = Field(
         default=2_000_000,
@@ -74,12 +85,27 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SUPPORTFLOW_DOCUMENT_SCANNER_MODE must not be fake outside local/test"
             )
+        if self.document_fake_scanner_gate_path is not None and (
+            self.environment not in {"local", "test"}
+            or self.document_scanner_mode != "fake"
+        ):
+            raise ValueError(
+                "Document fake scanner gate is restricted to local/test fake mode"
+            )
         if (
             self.document_ingestion_hard_time_limit_seconds
             <= self.document_ingestion_soft_time_limit_seconds
         ):
             raise ValueError(
                 "Document ingestion hard time limit must exceed the soft time limit"
+            )
+        if (
+            self.environment in {"staging", "production"}
+            and self.celery_visibility_timeout_seconds
+            <= self.document_ingestion_hard_time_limit_seconds
+        ):
+            raise ValueError(
+                "Celery visibility timeout must exceed the ingestion hard time limit"
             )
         return self
 

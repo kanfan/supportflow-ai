@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from pathlib import Path
+from time import monotonic, sleep
 from typing import BinaryIO, Protocol, runtime_checkable
 from uuid import UUID
 
@@ -40,9 +42,20 @@ class FakeDocumentSafetyScanner:
     def __init__(
         self,
         result: DocumentScanResult = DocumentScanResult.CLEAN,
+        *,
+        gate_path: Path | None = None,
+        gate_timeout_seconds: int = 120,
     ) -> None:
         self._result = result
+        self._gate_path = gate_path
+        self._gate_timeout_seconds = gate_timeout_seconds
 
     def scan(self, source: BinaryIO) -> DocumentScanResult:
         del source
+        if self._gate_path is not None:
+            deadline = monotonic() + self._gate_timeout_seconds
+            while not self._gate_path.exists():
+                if monotonic() >= deadline:
+                    return DocumentScanResult.UNAVAILABLE
+                sleep(0.05)
         return self._result

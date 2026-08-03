@@ -333,6 +333,12 @@ Ingestion uses a reusable bounded Celery policy:
 - 60-second soft time limit and 75-second hard time limit;
 - ignored Celery result payload for ingestion.
 
+The Redis visibility timeout defaults to 180 seconds, which is longer than the
+75-second hard task limit. This prevents a healthy long-running task from being
+delivered twice while still allowing an unacknowledged message from a fully
+killed worker container to return to the queue. The claimed-job crash smoke uses
+a local/test-only five-second override so this recovery is reproducible in CI.
+
 Retryable failures include temporary object-storage, scanner availability,
 database connectivity, and other explicitly classified infrastructure failures.
 

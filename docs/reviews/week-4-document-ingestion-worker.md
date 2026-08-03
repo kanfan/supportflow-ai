@@ -45,6 +45,10 @@ without its audit event.
 - `app/documents/tasks.py` defines the reusable late-acknowledged Celery policy,
   worker-loss rejection, three bounded retries, exponential jitter, 60/75-second
   limits, ignored results, and sanitized retry exceptions.
+- `compose.worker-loss.yaml` enables only the local/test fake-scanner gate and a
+  short Redis visibility window needed to reproduce a claimed-job container
+  crash quickly; normal configuration keeps a 180-second visibility timeout,
+  safely above the 75-second hard task limit.
 - `app/worker.py` composes the database, private storage, scanner, extractor, and
   task. Its separate publish-only client keeps API processes from constructing
   worker dependencies.
@@ -66,9 +70,10 @@ without its audit event.
   result storage.
 - PostgreSQL tests prove first delivery for all three media types, sequential and
   concurrent duplicate no-ops, same-task redelivery, transient retry, retry
-  exhaustion, tenant-owned lookup, and one existing version/result.
-- Atomicity tests force the ready audit commit to fail and prove neither ready
-  state nor extracted text survives the rollback.
+  exhaustion after one real retry, tenant-owned lookup, and one existing
+  version/result.
+- Atomicity tests independently force ready and failed audit commits to fail and
+  prove neither terminal state nor its terminal audit survives rollback.
 - Safety tests assert that filenames, storage keys, hashes, raw bytes, extracted
   text, and exception payloads do not enter worker logs, audit metadata, task
   arguments, Celery results, or status responses.
@@ -93,14 +98,16 @@ docker compose run --rm api python -m scripts.smoke_document_ingestion
 
 Local exact-branch evidence on 2026-08-01:
 
-- 182 automated tests passed against PostgreSQL;
+- 187 automated tests passed against PostgreSQL;
 - Ruff, format, Pyright, and lockfile checks passed;
 - Compose API/PostgreSQL/Redis/worker services became healthy;
 - migration check, queue smoke, upload-to-ready, duplicate no-op, and corrupt PDF
   safe-failure flows passed;
 - a post-smoke API/worker log scan found none of the filename or content canaries;
-- with the worker stopped, a new version remained `queued` with attempt `0`; the
-  same queued delivery reached `ready` after the worker restarted.
+- a live delivery reached `extracting` with attempt `1` and a task owner before
+  the worker container was killed with `SIGKILL`; after restart and Redis
+  visibility recovery, that same version reached `ready` with attempt `1`,
+  cleared ownership, one version/result, and exactly one terminal audit event.
 
 ## Residual boundaries
 

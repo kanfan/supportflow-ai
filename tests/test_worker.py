@@ -25,8 +25,14 @@ def test_celery_uses_configured_redis_urls() -> None:
             environment="test",
             celery_broker_url="redis://queue.example:6379/4",
             celery_result_backend_url="redis://queue.example:6379/5",
+            celery_visibility_timeout_seconds=240,
         )
     )
 
     assert application.conf.broker_url == "redis://queue.example:6379/4"
     assert application.conf.result_backend == "redis://queue.example:6379/5"
+    assert application.conf.broker_transport_options == {"visibility_timeout": 240}
+    assert application.conf.result_backend_transport_options == {
+        "visibility_timeout": 240
+    }
+    assert application.conf.visibility_timeout == 240

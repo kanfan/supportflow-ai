@@ -36,6 +36,13 @@ def create_celery_client(settings: Settings | None = None) -> Celery:
         task_serializer="json",
         timezone="UTC",
         worker_prefetch_multiplier=1,
+        broker_transport_options={
+            "visibility_timeout": (resolved_settings.celery_visibility_timeout_seconds)
+        },
+        result_backend_transport_options={
+            "visibility_timeout": (resolved_settings.celery_visibility_timeout_seconds)
+        },
+        visibility_timeout=resolved_settings.celery_visibility_timeout_seconds,
     )
     return application
 
