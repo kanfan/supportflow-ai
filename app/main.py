@@ -24,7 +24,7 @@ from app.errors import install_error_handlers
 from app.infrastructure.database import build_engine, build_session_factory
 from app.ui.router import router as ui_router
 from app.ui.session import BrowserSessionStore
-from app.worker import create_celery
+from app.worker import create_celery_client
 
 
 def create_app(
@@ -64,7 +64,7 @@ def create_app(
     application.state.document_task_dispatcher = (
         document_task_dispatcher
         if document_task_dispatcher is not None
-        else CeleryDocumentTaskDispatcher(create_celery(resolved_settings))
+        else CeleryDocumentTaskDispatcher(create_celery_client(resolved_settings))
     )
     application.state.document_max_upload_bytes = (
         resolved_settings.document_max_upload_bytes

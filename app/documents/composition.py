@@ -20,7 +20,10 @@ def resolve_document_safety_scanner(
                     "Fake scanner mode requires the deterministic fake adapter"
                 )
             return configured_scanner
-        return FakeDocumentSafetyScanner()
+        return FakeDocumentSafetyScanner(
+            gate_path=settings.document_fake_scanner_gate_path,
+            gate_timeout_seconds=(settings.document_fake_scanner_gate_timeout_seconds),
+        )
 
     if configured_scanner is None:
         raise DocumentScannerConfigurationError(

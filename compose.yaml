@@ -5,6 +5,7 @@ x-app-environment: &app-environment
   SUPPORTFLOW_REDIS_URL: redis://redis:6379/0
   SUPPORTFLOW_CELERY_BROKER_URL: redis://redis:6379/0
   SUPPORTFLOW_CELERY_RESULT_BACKEND_URL: redis://redis:6379/1
+  SUPPORTFLOW_DOCUMENT_STORAGE_ROOT: /app/.supportflow/documents
 
 x-app-depends-on: &app-depends-on
   postgres:
@@ -58,6 +59,8 @@ services:
       retries: 20
     ports:
       - "${SUPPORTFLOW_API_PORT:-8000}:8000"
+    volumes:
+      - document-storage:/app/.supportflow/documents
 
   worker:
     build:
@@ -65,6 +68,8 @@ services:
     command: celery -A app.worker.celery_app worker --loglevel=INFO
     environment: *app-environment
     depends_on: *app-depends-on
+    volumes:
+      - document-storage:/app/.supportflow/documents
     healthcheck:
       test:
         - CMD-SHELL
@@ -76,3 +81,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  document-storage:

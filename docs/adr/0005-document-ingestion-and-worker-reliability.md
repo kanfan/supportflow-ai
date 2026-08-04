@@ -333,6 +333,12 @@ Ingestion uses a reusable bounded Celery policy:
 - 60-second soft time limit and 75-second hard time limit;
 - ignored Celery result payload for ingestion.
 
+The Redis visibility timeout defaults to 180 seconds, which is longer than the
+75-second hard task limit. This prevents a healthy long-running task from being
+delivered twice while still allowing an unacknowledged message from a fully
+killed worker container to return to the queue. The claimed-job crash smoke uses
+a local/test-only five-second override so this recovery is reproducible in CI.
+
 Retryable failures include temporary object-storage, scanner availability,
 database connectivity, and other explicitly classified infrastructure failures.
 
@@ -371,6 +377,12 @@ it does not execute HTML, scripts, macros, or remote references.
 
 Extraction runs only in the worker, never inside the upload request. No chunks or
 embeddings are created in Week 4.
+
+Implementation outcome: Issue #33 selected `pypdf` 6.x for the PDF adapter. It
+supports Python 3.13, is typed and pure Python, and uses the BSD-3-Clause license.
+The adapter runs in strict mode, rejects encrypted/corrupt input, applies the
+250-page limit before page extraction, and checks the cumulative character bound
+after every page. OCR remains deferred.
 
 ### Audit and logging
 

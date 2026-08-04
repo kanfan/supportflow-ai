@@ -20,6 +20,7 @@ COPY app ./app
 COPY scripts ./scripts
 
 RUN useradd --create-home --uid 10001 supportflow \
+    && mkdir -p /app/.supportflow/documents \
     && chown -R supportflow:supportflow /app
 USER supportflow
 

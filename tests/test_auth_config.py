@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -24,4 +26,33 @@ def test_deployed_environment_rejects_fake_document_scanner() -> None:
         Settings(
             environment="staging",
             auth_secret_key=SecretStr("x" * 32),
+        )
+
+
+def test_document_worker_hard_limit_must_exceed_soft_limit() -> None:
+    with pytest.raises(ValidationError, match="hard time limit"):
+        Settings(
+            environment="test",
+            document_ingestion_soft_time_limit_seconds=60,
+            document_ingestion_hard_time_limit_seconds=60,
+        )
+
+
+def test_fake_scanner_gate_is_rejected_outside_local_test_fake_mode() -> None:
+    with pytest.raises(ValidationError, match="fake scanner gate"):
+        Settings(
+            environment="production",
+            auth_secret_key=SecretStr("x" * 32),
+            document_scanner_mode="external",
+            document_fake_scanner_gate_path=Path("/tmp/not-production-safe"),
+        )
+
+
+def test_deployed_visibility_timeout_must_exceed_worker_hard_limit() -> None:
+    with pytest.raises(ValidationError, match="visibility timeout"):
+        Settings(
+            environment="production",
+            auth_secret_key=SecretStr("x" * 32),
+            document_scanner_mode="external",
+            celery_visibility_timeout_seconds=75,
         )

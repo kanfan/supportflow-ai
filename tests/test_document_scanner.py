@@ -68,3 +68,25 @@ def test_production_accepts_concrete_external_scanner(tmp_path: Path) -> None:
     )
 
     assert application.state.document_safety_scanner is scanner
+
+
+def test_fake_scanner_gate_releases_only_after_marker_exists(
+    tmp_path: Path,
+) -> None:
+    gate_path = tmp_path / "release"
+    scanner = FakeDocumentSafetyScanner(
+        gate_path=gate_path,
+        gate_timeout_seconds=1,
+    )
+    gate_path.touch()
+
+    assert scanner.scan(BytesIO(b"safe")) is DocumentScanResult.CLEAN
+
+
+def test_fake_scanner_gate_times_out_as_unavailable(tmp_path: Path) -> None:
+    scanner = FakeDocumentSafetyScanner(
+        gate_path=tmp_path / "missing",
+        gate_timeout_seconds=0,
+    )
+
+    assert scanner.scan(BytesIO(b"safe")) is DocumentScanResult.UNAVAILABLE
