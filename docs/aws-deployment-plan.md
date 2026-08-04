@@ -52,6 +52,12 @@ cost is justified by NAT traffic and availability requirements.
 
 Complete before persistent resources are provisioned:
 
+Eray owns the AWS account, billing, MFA, administrative access, budget setup,
+Terraform state bootstrap, and infrastructure applies. Emir reviews repository
+plans, contracts, cost/security boundaries, and sanitized evidence without
+receiving root, administrator, or long-lived AWS credentials. ADR 0006 defines
+the complete handoff.
+
 - [ ] Choose the AWS account and initial region.
 - [ ] Enable MFA for human administrator access.
 - [ ] Define least-privilege human, CI, execution, and task roles.
@@ -164,16 +170,47 @@ Object recovery:
 
 ## Ownership
 
+In plain language: Eray owns and operates the Week 5 AWS account, platform,
+Terraform applies, and deployment pipeline. Emir does not set up or administer
+the account; he reviews the platform artifacts, implements the application AWS
+adapters, and leads technical staging verification. Review responsibility does
+not imply account or apply responsibility.
+
 | Area | Lead | Reviewer/pair |
 | --- | --- | --- |
-| Week 5 alpha release and migration | Emir | Eray |
+| AWS account, billing, Terraform state, and platform apply | Eray | Emir |
+| Week 5 alpha release and migration | Eray | Emir |
 | CI image/OIDC workflow | Eray | Emir |
-| Network/IAM threat review | Shared | Shared |
-| RDS/pgvector and backup proof | Emir | Eray |
+| Network/IAM implementation | Eray | Emir |
+| RDS/pgvector and backup proof | Eray | Emir |
 | ECS worker reliability | Eray | Emir |
-| ElastiCache sessions and queue boundary | Shared | Shared |
+| S3/scanner application adapters and readiness | Emir | Eray |
+| ElastiCache sessions and application queue boundary | Emir | Eray |
+| Week 5 staging technical verification | Emir | Eray |
 | Week 11 restore/rollback rehearsal | Eray | Emir |
 | Week 12 production-demo release | Shared | Shared |
+
+### Week 5 platform handoff
+
+Eray's platform handoff must be represented by Terraform, sanitized plans and
+apply evidence, non-secret outputs, OIDC/environment contracts, and deploy,
+rollback, restore, cost-response, and destroy runbooks. Configuration that
+exists only in an AWS console or one contributor's memory does not satisfy the
+handoff.
+
+Emir consumes resource/configuration contracts and secret reference names, not
+root credentials, long-lived access keys, or secret values. If later interactive
+inspection is necessary, it uses an individual, least-privilege, time-bounded
+role. Eray remains the single Week 5 Terraform Apply/Release Captain so two
+changes cannot race the same staging state.
+
+The tracked work packages are:
+
+- #37: AWS platform foundation and handoff, led by Eray;
+- #38: AWS application adapters and readiness, led by Emir;
+- #39: immutable AWS deployment pipeline, led by Eray;
+- #40: staging technical verification, led by Emir with Eray providing platform
+  evidence.
 
 ## Explicit cost boundary
 
