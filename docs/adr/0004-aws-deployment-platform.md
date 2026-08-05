@@ -188,10 +188,11 @@ The first infrastructure modules cover:
 
 - Week 4 remains document ingestion and reliable background jobs. The storage
   adapter targets S3, while local tests use a fake or local adapter.
-- Week 5 becomes the AWS alpha milestone. Emir is Release Captain; Eray is CI
-  Captain. The team provisions staging, deploys API and worker, runs the
-  migration task, seeds synthetic demo data, verifies smoke tests, and rehearses
-  rollback.
+- Week 5 becomes the AWS alpha milestone. ADR 0006 supersedes the original
+  operational assignment: Eray is AWS Platform and Release Captain; Emir is
+  Application Integration and Verification Lead. The team provisions staging,
+  deploys API and worker, runs the migration task, seeds synthetic demo data,
+  verifies smoke tests, and rehearses rollback.
 - Week 9 deploys the AI/RAG beta through the same ECR/ECS path.
 - Week 11 performs restore, rollback, load, security, and 48-hour release
   candidate observation on AWS.
