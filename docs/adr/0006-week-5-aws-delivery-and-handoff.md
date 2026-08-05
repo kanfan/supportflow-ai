@@ -1,6 +1,6 @@
 # ADR 0006: Week 5 AWS delivery ownership and handoff
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-04
 - Owners: Emir and Eray
 - Tracks: #37, #38, #39, and #40
@@ -111,18 +111,23 @@ The dependency order is:
 
 ```text
 ADR 0006 accepted
-  -> #37 account safety + budget + state bootstrap
-  -> #37 reviewed Terraform plan and platform contracts
-       |-> #38 application adapter implementation
-       \-> #39 deployment pipeline implementation
-  -> #37 + #38 + #39 integrated staging release
+  |-> #37 account safety + budget + state + platform/plan work
+  |-> #38 local adapters + contract tests
+  \-> #39 deployment pipeline scaffolding
+  -> #37 safety/state/plan/teardown gates reviewed
+  -> Eray performs persistent staging apply
+  -> sanitized #37 outputs + contract-ready #38 + pipeline-ready #39
+  -> live integration and staging release
   -> #40 technical acceptance
   -> separate two-user task-based product validation
 ```
 
-Contract and local unit work may overlap after this ADR is accepted. Persistent
-AWS resources are not applied before the account-safety, budget, state, plan,
-and teardown gates in #37 pass.
+The first three work streams begin in parallel after this ADR is accepted. #38
+may implement local adapters and contract tests, and #39 may build pipeline
+scaffolding, while #37 establishes the platform. Persistent AWS resources are
+not applied before #37's account-safety, budget, state, reviewed-plan, and
+teardown gates pass. Live #38/#39 integration waits for the relevant sanitized
+#37 outputs.
 
 ### Platform handoff contract
 
@@ -257,7 +262,10 @@ must be able to explain it.
 
 ## Approval
 
-This ADR remains `Proposed` until Eray confirms the platform/release ownership,
-both contributors accept the four-issue dependency order, and the #37 handoff
-contract is judged sufficient. The approving change updates the status to
-`Accepted` before the documentation PR is marked ready.
+Eray reviewed exact head `05afb05` on 2026-08-05 and accepted the responsibility
+matrix, credential boundary, issue ownership, and overall dependency model. His
+single requested clarification was to show #37 platform work, #38 local adapter
+work, and #39 pipeline scaffolding starting in parallel after ADR acceptance,
+while preserving the #37 gates for persistent apply and live integration. This
+revision records that clarification and changes the ADR to `Accepted`; the pull
+request remains draft until the new exact head is re-reviewed.

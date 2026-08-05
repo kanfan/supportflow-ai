@@ -212,6 +212,12 @@ The tracked work packages are:
 - #40: staging technical verification, led by Emir with Eray providing platform
   evidence.
 
+After ADR 0006 is accepted, #37 platform/safety work, #38 local adapter and
+contract-test work, and #39 pipeline scaffolding proceed in parallel. Persistent
+AWS apply still waits for #37's safety, budget, state, reviewed-plan, and
+teardown gates. Live application/pipeline integration waits for the relevant
+sanitized #37 outputs, and #40 waits for all three implementation issues.
+
 ## Explicit cost boundary
 
 AWS resources are not free merely because traffic is low. Persistent ALB, NAT,
