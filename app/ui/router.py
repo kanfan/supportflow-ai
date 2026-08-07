@@ -32,7 +32,12 @@ from app.tickets.service import (
     TicketPersistenceError,
     TicketService,
 )
-from app.ui.session import BrowserSession, BrowserSessionStore, UI_SESSION_COOKIE
+from app.ui.session import (
+    BrowserSession,
+    BrowserSessionStore,
+    BrowserSessionStoreUnavailableError,
+    UI_SESSION_COOKIE,
+)
 
 
 router = APIRouter(prefix="/ui", tags=["agent-ui"])
@@ -130,6 +135,19 @@ def render_error(
         "error.html",
         {"message": message},
         status_code=status_code,
+    )
+
+
+async def browser_session_unavailable_handler(
+    request: Request,
+    exc: Exception,
+) -> HTMLResponse:
+    if not isinstance(exc, BrowserSessionStoreUnavailableError):
+        raise exc
+    return render_error(
+        request,
+        message="Oturum hizmeti geçici olarak kullanılamıyor. Lütfen tekrar deneyin.",
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
     )
 
 

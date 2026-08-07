@@ -22,8 +22,13 @@ from app.documents.ports import (
 from app.documents.storage import LocalDocumentStorage
 from app.errors import install_error_handlers
 from app.infrastructure.database import build_engine, build_session_factory
-from app.ui.router import router as ui_router
-from app.ui.session import BrowserSessionStore
+from app.ui.router import browser_session_unavailable_handler, router as ui_router
+from app.ui.session import (
+    BrowserSessionStore,
+    BrowserSessionStoreUnavailableError,
+    InMemoryBrowserSessionStore,
+    RedisBrowserSessionStore,
+)
 from app.worker import create_celery_client
 
 
@@ -33,6 +38,7 @@ def create_app(
     document_safety_scanner: DocumentSafetyScanner | None = None,
     document_storage: DocumentStorage | None = None,
     document_task_dispatcher: DocumentTaskDispatcher | None = None,
+    browser_session_store: BrowserSessionStore | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     resolved_document_safety_scanner = resolve_document_safety_scanner(
@@ -73,11 +79,26 @@ def create_app(
     application.state.access_token_manager = AccessTokenManager.from_settings(
         resolved_settings
     )
-    application.state.browser_session_store = BrowserSessionStore(
-        secret_key=resolved_settings.auth_secret_key.get_secret_value(),
-        lifetime=timedelta(minutes=resolved_settings.ui_session_ttl_minutes),
+    session_store_lifetime = timedelta(minutes=resolved_settings.ui_session_ttl_minutes)
+    application.state.browser_session_store = (
+        browser_session_store
+        if browser_session_store is not None
+        else InMemoryBrowserSessionStore(
+            secret_key=resolved_settings.auth_secret_key.get_secret_value(),
+            lifetime=session_store_lifetime,
+        )
+        if resolved_settings.environment == "test"
+        else RedisBrowserSessionStore.from_url(
+            redis_url=resolved_settings.redis_url,
+            secret_key=resolved_settings.auth_secret_key.get_secret_value(),
+            lifetime=session_store_lifetime,
+        )
     )
     install_error_handlers(application)
+    application.add_exception_handler(
+        BrowserSessionStoreUnavailableError,
+        browser_session_unavailable_handler,
+    )
     application.include_router(health_router)
     application.include_router(auth_router)
     application.include_router(documents_router)

@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 10
     env:
       SUPPORTFLOW_TEST_DATABASE_URL: postgresql+psycopg://supportflow:supportflow@127.0.0.1:5432/supportflow_test
+      SUPPORTFLOW_TEST_REDIS_URL: redis://127.0.0.1:6379/0
 
     services:
       postgres:
@@ -33,6 +34,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U supportflow -d supportflow_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:8.4.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 3s
           --health-timeout 3s
           --health-retries 20
@@ -93,6 +103,9 @@ jobs:
 
       - name: Check API
         run: curl --fail --show-error http://127.0.0.1:8000/health/live
+
+      - name: Check shared browser sessions
+        run: docker compose run --rm api python -m scripts.smoke_ui_session
 
       - name: Check worker queue round trip
         run: docker compose run --rm api python -m scripts.smoke_worker
