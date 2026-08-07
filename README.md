@@ -4,12 +4,14 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status:** The foundation and core support backend are complete on
-> `main`: authentication, verified organization context, admin/agent membership
-> controls, tenant-scoped ticket workflows, append-only audit events, and a
-> minimal authenticated agent workspace. Week 4 adds secure tenant-scoped
-> document uploads plus retry-safe PDF/TXT/Markdown ingestion. AI/RAG remains
-> follow-up work.
+> **Project status:** Weeks 1-4 are complete on `main`: authentication, verified
+> organization context, admin/agent membership controls, tenant-scoped ticket
+> workflows, append-only audit events, the authenticated agent workspace, secure
+> document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
+> automated suite contains 187 tests and passes with PostgreSQL integration
+> enabled. Week 5 AWS staging delivery is now in progress; no AWS staging
+> deployment is claimed yet. AI classification and RAG remain follow-up
+> milestones.
 
 ## The problem
 
@@ -95,14 +97,15 @@ complete platform decision and phased implementation plan are documented in
 [ADR 0004](./docs/adr/0004-aws-deployment-platform.md) and the
 [AWS deployment plan](./docs/aws-deployment-plan.md).
 
-## Current milestone: Week 4 document ingestion
+## Current milestone: Week 5 AWS staging alpha
 
-The current codebase proves the Week 1-3 application, security, ticket, audit,
-and agent-workspace foundations. Week 4 introduces private document storage,
-version-owned processing state, safe upload validation, and an ID-only boundary
-between the API and background worker.
+The current codebase proves the Week 1-4 application, security, ticket, audit,
+agent-workspace, document-upload, and reliable-ingestion foundations. Week 5
+moves that existing system toward a short-lived AWS staging alpha using the
+accepted ownership and handoff contract in
+[ADR 0006](./docs/adr/0006-week-5-aws-delivery-and-handoff.md).
 
-### Acceptance criteria
+### Completed baseline
 
 - [x] `docker compose up` starts PostgreSQL/pgvector, Redis, the API, and the worker.
 - [x] FastAPI exposes `GET /health/live`.
@@ -122,21 +125,37 @@ between the API and background worker.
 - [x] Reliable PDF/TXT/Markdown extraction and retry processing are implemented.
 - [x] Duplicate/redelivered document tasks converge on one terminal result and audit event.
 - [x] API and worker containers share a private storage volume for local ingestion.
-- [ ] AI/RAG is implemented.
+- [x] A claimed `extracting` task survives worker `SIGKILL` and Redis redelivery without duplicate terminal effects.
+- [x] 187 automated tests with PostgreSQL integration and the Quality/Container smoke workflows pass on `main`.
 
-## Initial ownership
+### Week 5 acceptance targets
+
+- [x] ADR 0006 defines the AWS ownership, credential, apply, handoff, and dependency boundaries.
+- [ ] #37 provisions the reviewed AWS platform foundation and publishes sanitized outputs and runbooks.
+- [ ] #38 supplies the S3/scanner/session/readiness application adapters.
+- [ ] #39 deploys one immutable image digest through scoped GitHub OIDC.
+- [ ] #40 records integrated staging, rollback, recovery, security, cost, and teardown evidence.
+- [ ] Product validation starts only after the technical staging alpha is accepted.
+
+## Week 5 ownership and handoff
 
 Ownership means leading and explaining a feature, not working alone.
 
-| Area | Initial lead | Reviewer / pair |
+| Work package | Lead | Reviewer / pair |
 | --- | --- | --- |
-| Repository and FastAPI skeleton | Emir | Eray |
-| PostgreSQL, Redis, and Docker Compose | Eray | Emir |
-| Testing and initial CI | Eray | Emir |
-| API conventions and error format | Emir | Eray |
-| Integration and weekly demonstration | Shared | Shared |
+| #37 AWS account safety, Terraform state, platform, and applies | Eray | Emir |
+| #38 S3/scanner/session/readiness application adapters | Emir | Eray |
+| #39 GitHub OIDC and immutable deployment pipeline | Eray | Emir |
+| #40 AWS staging technical verification | Emir | Eray |
+| Product validation after #40 | Emir | Eray |
 
-Feature leadership will rotate as the project progresses.
+After ADR 0006 acceptance, #37 platform work, #38 local adapter/contract work,
+and #39 pipeline scaffolding can proceed in parallel. Persistent AWS apply waits
+for the #37 account-safety, budget, state, reviewed-plan, and teardown gates;
+live integration waits for sanitized #37 outputs. Eray is the Week 5 Terraform
+Apply/Release Captain. Emir does not need AWS root, administrator, or long-lived
+credentials and reviews the infrastructure through code, plans, non-secret
+outputs, evidence, and runbooks.
 
 ## Roadmap
 
@@ -372,7 +391,7 @@ The audit service supplies safe factories used by membership and ticket
 mutations. Repositories add rows but never commit independently; the business
 service owns the transaction.
 
-### Document upload foundation
+### Document upload and ingestion
 
 An authenticated organization `admin` can upload one PDF, UTF-8 text, or
 Markdown file with `POST /api/v1/documents`. The API streams the body into a
@@ -398,12 +417,13 @@ Use the `Location` returned by a successful `202 Accepted` response with
 verified `X-Organization-ID`; missing and cross-tenant identifiers return the
 same `404`.
 
-The scanner interface and fail-closed environment guard are present in this
-foundation. The fake scanner is allowed only for local/test environments. The
-`external` configuration label alone is not sufficient: staging/production
-startup requires a concrete non-fake scanner adapter. The worker-side
-extraction, real adapter construction, retry/idempotency behavior, and status
-transitions are implemented separately under Issue #33.
+The scanner interface and fail-closed environment guard are present. The fake
+scanner is allowed only for local/test environments. The `external`
+configuration label alone is not sufficient: staging/production startup
+requires a concrete non-fake scanner adapter. Worker-side extraction,
+retry/idempotency behavior, terminal audit atomicity, and status transitions are
+implemented on `main`; the production-like scanner adapter and live S3
+integration remain Week 5 application work under #38.
 
 ### Database migrations
 
@@ -480,10 +500,12 @@ The complete AWS-aligned project plan (revision 1.2) is available in
 - [ADR 0003: Week 3 security, workflow, audit, and UI contracts](./docs/adr/0003-week-3-security-workflow-and-ui-contracts.md)
 - [ADR 0004: AWS deployment platform](./docs/adr/0004-aws-deployment-platform.md)
 - [ADR 0005: Document ingestion and worker reliability contracts](./docs/adr/0005-document-ingestion-and-worker-reliability.md)
+- [ADR 0006: Week 5 AWS delivery ownership and handoff](./docs/adr/0006-week-5-aws-delivery-and-handoff.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 - [Week 3 threat model](./docs/security/week-3-threat-model.md)
 - [Week 3 release verification](./docs/reviews/week-3-verification.md)
+- [Week 4 document ingestion worker review](./docs/reviews/week-4-document-ingestion-worker.md)
 
 The plan is a roadmap, not an implementation claim. This README will evolve as working features, tests, measurements, and known limitations are added.
 
