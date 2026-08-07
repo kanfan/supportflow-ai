@@ -10,12 +10,10 @@ import json
 import re
 import secrets
 from threading import Lock
-from typing import Protocol, cast
+from typing import Protocol
 from uuid import UUID
 
-from redis import Redis
 from redis.exceptions import RedisError
-
 
 UI_SESSION_COOKIE = "supportflow_ui_session"
 DEFAULT_UI_SESSION_KEY_PREFIX = "supportflow:ui-session:v1:"
@@ -225,33 +223,6 @@ class RedisBrowserSessionStore(_SignedBrowserSessionStore):
             )
         self._client = client
         self._key_prefix = key_prefix
-
-    @classmethod
-    def from_url(
-        cls,
-        *,
-        redis_url: str,
-        secret_key: str,
-        lifetime: timedelta,
-        key_prefix: str = DEFAULT_UI_SESSION_KEY_PREFIX,
-        clock: Callable[[], datetime] | None = None,
-    ) -> RedisBrowserSessionStore:
-        client = cast(
-            RedisSessionClient,
-            Redis.from_url(
-                redis_url,
-                decode_responses=True,
-                socket_connect_timeout=2,
-                socket_timeout=2,
-            ),
-        )
-        return cls(
-            client=client,
-            secret_key=secret_key,
-            lifetime=lifetime,
-            key_prefix=key_prefix,
-            clock=clock,
-        )
 
     def create_anonymous(
         self, previous_cookie: str | None = None

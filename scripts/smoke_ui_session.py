@@ -1,10 +1,16 @@
 from datetime import timedelta
 from http.cookies import SimpleCookie
 import os
+from typing import cast
 from urllib.request import urlopen
 
 from app.config import get_settings
-from app.ui.session import RedisBrowserSessionStore, UI_SESSION_COOKIE
+from app.infrastructure.redis import build_redis_client
+from app.ui.session import (
+    RedisBrowserSessionStore,
+    RedisSessionClient,
+    UI_SESSION_COOKIE,
+)
 
 
 def main() -> None:
@@ -22,17 +28,24 @@ def main() -> None:
     if morsel is None:
         raise RuntimeError("UI session smoke received an unexpected cookie")
 
-    independent_store = RedisBrowserSessionStore.from_url(
-        redis_url=settings.redis_url,
+    redis_client = build_redis_client(
+        settings.redis_url,
+        timeout_seconds=settings.dependency_connect_timeout_seconds,
+    )
+    independent_store = RedisBrowserSessionStore(
+        client=cast(RedisSessionClient, redis_client),
         secret_key=settings.auth_secret_key.get_secret_value(),
         lifetime=timedelta(minutes=settings.ui_session_ttl_minutes),
     )
-    session = independent_store.resolve(morsel.value)
-    if session is None or session.is_authenticated:
-        raise RuntimeError("UI session is not visible through shared Redis storage")
-    independent_store.invalidate(morsel.value)
-    if independent_store.resolve(morsel.value) is not None:
-        raise RuntimeError("Invalidated UI session can still be replayed")
+    try:
+        session = independent_store.resolve(morsel.value)
+        if session is None or session.is_authenticated:
+            raise RuntimeError("UI session is not visible through shared Redis storage")
+        independent_store.invalidate(morsel.value)
+        if independent_store.resolve(morsel.value) is not None:
+            raise RuntimeError("Invalidated UI session can still be replayed")
+    finally:
+        redis_client.close()
 
     print("Shared UI session smoke test passed")
 

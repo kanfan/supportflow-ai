@@ -18,10 +18,25 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-def build_engine(database_url: str, *, echo: bool = False) -> Engine:
+def build_engine(
+    database_url: str,
+    *,
+    echo: bool = False,
+    connect_timeout_seconds: int | None = None,
+) -> Engine:
     """Create a synchronous SQLAlchemy engine for API or worker processes."""
 
-    return create_engine(database_url, echo=echo, pool_pre_ping=True)
+    connect_args = (
+        {"connect_timeout": connect_timeout_seconds}
+        if connect_timeout_seconds is not None
+        else {}
+    )
+    return create_engine(
+        database_url,
+        echo=echo,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
 
 
 def build_session_factory(engine: Engine) -> sessionmaker[Session]:

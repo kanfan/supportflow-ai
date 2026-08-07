@@ -1,8 +1,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from typing import cast
 
 from fastapi import FastAPI
+from redis import Redis
 
 from app.api.audit_events import router as audit_events_router
 from app.api.auth import router as auth_router
@@ -22,12 +24,21 @@ from app.documents.ports import (
 from app.documents.storage import LocalDocumentStorage
 from app.errors import install_error_handlers
 from app.infrastructure.database import build_engine, build_session_factory
+from app.infrastructure.readiness import (
+    AlwaysReadyProbe,
+    ReadinessProbe,
+    RedisReadinessClient,
+    RuntimeReadinessProbe,
+)
+from app.infrastructure.redis import build_redis_client
+from app.observability import RequestIdMiddleware
 from app.ui.router import browser_session_unavailable_handler, router as ui_router
 from app.ui.session import (
     BrowserSessionStore,
     BrowserSessionStoreUnavailableError,
     InMemoryBrowserSessionStore,
     RedisBrowserSessionStore,
+    RedisSessionClient,
 )
 from app.worker import create_celery_client
 
@@ -39,19 +50,34 @@ def create_app(
     document_storage: DocumentStorage | None = None,
     document_task_dispatcher: DocumentTaskDispatcher | None = None,
     browser_session_store: BrowserSessionStore | None = None,
+    readiness_probe: ReadinessProbe | None = None,
+    redis_client: Redis | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     resolved_document_safety_scanner = resolve_document_safety_scanner(
         resolved_settings,
         document_safety_scanner,
     )
-    engine = build_engine(resolved_settings.database_url)
+    engine = build_engine(
+        resolved_settings.database_url,
+        connect_timeout_seconds=(resolved_settings.dependency_connect_timeout_seconds),
+    )
     session_factory = build_session_factory(engine)
+    resolved_redis_client = redis_client
+    if resolved_redis_client is None and resolved_settings.environment != "test":
+        resolved_redis_client = build_redis_client(
+            resolved_settings.redis_url,
+            timeout_seconds=resolved_settings.dependency_connect_timeout_seconds,
+        )
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
-        yield
-        engine.dispose()
+        try:
+            yield
+        finally:
+            engine.dispose()
+            if resolved_redis_client is not None:
+                resolved_redis_client.close()
 
     application = FastAPI(
         title=resolved_settings.app_name,
@@ -59,6 +85,7 @@ def create_app(
         debug=resolved_settings.debug,
         lifespan=lifespan,
     )
+    application.add_middleware(RequestIdMiddleware)
     application.state.settings = resolved_settings
     application.state.session_factory = session_factory
     application.state.document_safety_scanner = resolved_document_safety_scanner
@@ -80,20 +107,30 @@ def create_app(
         resolved_settings
     )
     session_store_lifetime = timedelta(minutes=resolved_settings.ui_session_ttl_minutes)
-    application.state.browser_session_store = (
-        browser_session_store
-        if browser_session_store is not None
-        else InMemoryBrowserSessionStore(
+    if browser_session_store is not None:
+        resolved_browser_session_store = browser_session_store
+    elif resolved_redis_client is not None:
+        resolved_browser_session_store = RedisBrowserSessionStore(
+            client=cast(RedisSessionClient, resolved_redis_client),
             secret_key=resolved_settings.auth_secret_key.get_secret_value(),
             lifetime=session_store_lifetime,
         )
-        if resolved_settings.environment == "test"
-        else RedisBrowserSessionStore.from_url(
-            redis_url=resolved_settings.redis_url,
+    else:
+        resolved_browser_session_store = InMemoryBrowserSessionStore(
             secret_key=resolved_settings.auth_secret_key.get_secret_value(),
             lifetime=session_store_lifetime,
         )
-    )
+    application.state.browser_session_store = resolved_browser_session_store
+    if readiness_probe is not None:
+        resolved_readiness_probe = readiness_probe
+    elif resolved_redis_client is not None:
+        resolved_readiness_probe = RuntimeReadinessProbe(
+            engine,
+            cast(RedisReadinessClient, resolved_redis_client),
+        )
+    else:
+        resolved_readiness_probe = AlwaysReadyProbe()
+    application.state.readiness_probe = resolved_readiness_probe
     install_error_handlers(application)
     application.add_exception_handler(
         BrowserSessionStoreUnavailableError,
