@@ -8,7 +8,7 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > organization context, admin/agent membership controls, tenant-scoped ticket
 > workflows, append-only audit events, the authenticated agent workspace, secure
 > document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
-> automated suite contains 187 tests and passes with PostgreSQL integration
+> automated suite contains 194 tests and passes with PostgreSQL and Redis integration
 > enabled. Week 5 AWS staging delivery is now in progress; no AWS staging
 > deployment is claimed yet. AI classification and RAG remain follow-up
 > milestones.
@@ -90,9 +90,9 @@ push a commit-SHA image, run Alembic as a one-off ECS task, deploy the same imag
 digest to the API and worker, wait for health, and run smoke tests. Secrets are
 resolved from AWS Secrets Manager; container logs and alarms use CloudWatch.
 
-The Week 3 process-local browser session store is not an AWS production
-boundary. Before multiple API tasks or restart-resilient sessions are enabled,
-session state must move to ElastiCache with TTLs and namespaced keys. The
+Browser session state now uses a Redis-backed adapter with server-side TTLs and
+versioned namespaced keys, while tests retain a deterministic in-memory adapter.
+Live ElastiCache TLS and API task-replacement evidence remain Week 5 gates. The
 complete platform decision and phased implementation plan are documented in
 [ADR 0004](./docs/adr/0004-aws-deployment-platform.md) and the
 [AWS deployment plan](./docs/aws-deployment-plan.md).
@@ -126,7 +126,7 @@ accepted ownership and handoff contract in
 - [x] Duplicate/redelivered document tasks converge on one terminal result and audit event.
 - [x] API and worker containers share a private storage volume for local ingestion.
 - [x] A claimed `extracting` task survives worker `SIGKILL` and Redis redelivery without duplicate terminal effects.
-- [x] 187 automated tests with PostgreSQL integration and the Quality/Container smoke workflows pass on `main`.
+- [x] 194 automated tests with PostgreSQL/Redis integration and the Quality/Container smoke workflows pass on `main`.
 
 ### Week 5 acceptance targets
 
@@ -358,9 +358,12 @@ remain server-side; login replaces the pre-authentication session and rotates th
 CSRF token, while logout invalidates the server-side session. Staging and
 production cookies also use `Secure`.
 
-The Week 3 session store is intentionally in-process and suitable for the
-single-process demo. Shared, durable session storage for multiple API instances
-remains a production follow-up recorded in ADR 0003.
+Outside the test environment, sessions use Redis with a versioned
+`supportflow:ui-session` key namespace and server-side TTL. Rotation deletes the
+old session and creates the new session in one Redis transaction. Tests use the
+same storage contract with a deterministic in-memory adapter, and CI verifies
+cross-instance visibility against a real Redis service. Live ElastiCache TLS and
+API task-replacement evidence remain part of #38/#40.
 
 ### Membership and audit flow
 
