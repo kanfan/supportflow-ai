@@ -147,7 +147,7 @@ Ownership means leading and explaining a feature, not working alone.
 | #38 S3/scanner/session/readiness application adapters | Emir | Eray |
 | #39 GitHub OIDC and immutable deployment pipeline | Eray | Emir |
 | #40 AWS staging technical verification | Emir | Eray |
-| Product validation after #40 | Shared | Shared |
+| Product validation after #40 | Emir | Eray |
 
 After ADR 0006 acceptance, #37 platform work, #38 local adapter/contract work,
 and #39 pipeline scaffolding can proceed in parallel. Persistent AWS apply waits
