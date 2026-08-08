@@ -10,6 +10,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.pool import QueuePool
 
 from app.config import Settings
 from app.infrastructure.database import build_engine
@@ -133,6 +134,19 @@ def test_application_closes_its_shared_redis_client() -> None:
         assert redis_client.closed is False
 
     assert redis_client.closed is True
+
+
+def test_database_dependency_timeout_also_bounds_pool_checkout() -> None:
+    engine = build_engine(
+        "postgresql+psycopg://unused:unused@localhost/unused",
+        connect_timeout_seconds=2,
+    )
+
+    try:
+        assert isinstance(engine.pool, QueuePool)
+        assert engine.pool.timeout() == 2
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture

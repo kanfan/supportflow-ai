@@ -26,16 +26,19 @@ def build_engine(
 ) -> Engine:
     """Create a synchronous SQLAlchemy engine for API or worker processes."""
 
-    connect_args = (
-        {"connect_timeout": connect_timeout_seconds}
-        if connect_timeout_seconds is not None
-        else {}
-    )
+    if connect_timeout_seconds is None:
+        return create_engine(
+            database_url,
+            echo=echo,
+            pool_pre_ping=True,
+        )
+
     return create_engine(
         database_url,
         echo=echo,
         pool_pre_ping=True,
-        connect_args=connect_args,
+        connect_args={"connect_timeout": connect_timeout_seconds},
+        pool_timeout=connect_timeout_seconds,
     )
 
 
