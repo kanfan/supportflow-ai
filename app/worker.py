@@ -4,11 +4,13 @@ from celery import Celery
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.documents.composition import resolve_document_safety_scanner
+from app.documents.composition import (
+    resolve_document_safety_scanner,
+    resolve_document_storage,
+)
 from app.documents.extraction import DocumentExtractorRegistry, ExtractionLimits
 from app.documents.ingestion import DocumentIngestionService
 from app.documents.ports import DocumentSafetyScanner, DocumentStorage
-from app.documents.storage import LocalDocumentStorage
 from app.documents.tasks import register_document_ingestion_task
 from app.infrastructure.database import build_engine, build_session_factory
 
@@ -60,8 +62,9 @@ def create_celery(
         resolved_settings,
         document_safety_scanner,
     )
-    resolved_storage = document_storage or LocalDocumentStorage(
-        resolved_settings.document_storage_root
+    resolved_storage = resolve_document_storage(
+        resolved_settings,
+        document_storage,
     )
     if session_factory is None:
         engine = build_engine(

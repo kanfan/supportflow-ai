@@ -11,6 +11,7 @@ from app.documents.ports import (
     DocumentScanResult,
     FakeDocumentSafetyScanner,
 )
+from app.documents.storage import InMemoryDocumentStorage
 from app.main import create_app
 
 
@@ -34,6 +35,9 @@ def production_settings(storage_root: Path) -> Settings:
         environment="production",
         auth_secret_key=SecretStr("x" * 32),
         document_scanner_mode="external",
+        document_storage_mode="s3",
+        document_s3_bucket="supportflow-production-documents",
+        document_s3_region="eu-central-1",
         document_storage_root=storage_root,
     )
 
@@ -65,6 +69,7 @@ def test_production_accepts_concrete_external_scanner(tmp_path: Path) -> None:
     application = create_app(
         production_settings(tmp_path),
         document_safety_scanner=scanner,
+        document_storage=InMemoryDocumentStorage(),
     )
 
     assert application.state.document_safety_scanner is scanner
