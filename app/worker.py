@@ -64,7 +64,12 @@ def create_celery(
         resolved_settings.document_storage_root
     )
     if session_factory is None:
-        engine = build_engine(resolved_settings.database_url)
+        engine = build_engine(
+            resolved_settings.database_url,
+            connect_timeout_seconds=(
+                resolved_settings.dependency_connect_timeout_seconds
+            ),
+        )
         resolved_session_factory: Callable[[], Session] = build_session_factory(engine)
     else:
         resolved_session_factory = session_factory

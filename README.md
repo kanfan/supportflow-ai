@@ -8,7 +8,7 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > organization context, admin/agent membership controls, tenant-scoped ticket
 > workflows, append-only audit events, the authenticated agent workspace, secure
 > document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
-> automated suite contains 194 tests and passes with PostgreSQL and Redis integration
+> automated suite contains 202 tests and passes with PostgreSQL and Redis integration
 > enabled. Week 5 AWS staging delivery is now in progress; no AWS staging
 > deployment is claimed yet. AI classification and RAG remain follow-up
 > milestones.
@@ -108,7 +108,7 @@ accepted ownership and handoff contract in
 ### Completed baseline
 
 - [x] `docker compose up` starts PostgreSQL/pgvector, Redis, the API, and the worker.
-- [x] FastAPI exposes `GET /health/live`.
+- [x] FastAPI exposes dependency-free `GET /health/live` and dependency-aware `GET /health/ready`.
 - [x] A sample Celery task is processed through Redis.
 - [x] Automated tests cover the API contract and worker foundation.
 - [x] Linting and type checking run successfully.
@@ -126,7 +126,7 @@ accepted ownership and handoff contract in
 - [x] Duplicate/redelivered document tasks converge on one terminal result and audit event.
 - [x] API and worker containers share a private storage volume for local ingestion.
 - [x] A claimed `extracting` task survives worker `SIGKILL` and Redis redelivery without duplicate terminal effects.
-- [x] 194 automated tests with PostgreSQL/Redis integration and the Quality/Container smoke workflows pass on `main`.
+- [x] 202 automated tests with PostgreSQL/Redis integration and the Quality/Container smoke workflows pass on `main`.
 
 ### Week 5 acceptance targets
 
@@ -210,8 +210,16 @@ Available local endpoints and services:
 | API | <http://127.0.0.1:8000> |
 | OpenAPI UI | <http://127.0.0.1:8000/docs> |
 | Liveness | <http://127.0.0.1:8000/health/live> |
+| Readiness | <http://127.0.0.1:8000/health/ready> |
 | PostgreSQL/pgvector | `127.0.0.1:5432` |
 | Redis | `127.0.0.1:6379` |
+
+`/health/live` reports only whether the API process can answer HTTP. The API
+container and future ALB target use `/health/ready`, which requires both a
+PostgreSQL `SELECT 1` and Redis `PING`. Dependency failures return only
+`{"status":"unavailable"}` with `503`; safe logs carry stable dependency and
+error categories. Every HTTP response includes a server-generated
+`X-Request-ID` correlation identifier, and caller-supplied values are ignored.
 
 Verify that a task travels through Redis, runs on the worker, and returns its result:
 

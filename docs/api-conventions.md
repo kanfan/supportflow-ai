@@ -3,7 +3,7 @@
 ## Versioning
 
 Business endpoints will use the `/api/v1` prefix. Operational endpoints such as
-`/health/live` remain unversioned.
+`/health/live` and `/health/ready` remain unversioned.
 
 ## Error envelope
 

@@ -26,6 +26,7 @@ class Settings(BaseSettings):
         "postgresql+psycopg://supportflow:supportflow@localhost:5432/supportflow"
     )
     redis_url: str = "redis://localhost:6379/0"
+    dependency_connect_timeout_seconds: int = Field(default=2, ge=1, le=10)
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend_url: str = "redis://localhost:6379/1"
     celery_visibility_timeout_seconds: int = Field(

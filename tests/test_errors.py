@@ -1,8 +1,13 @@
+import logging
+from uuid import UUID
+
 from fastapi import HTTPException, Query
 from fastapi.testclient import TestClient
+import pytest
 
 from app.config import Settings
 from app.main import create_app
+from app.observability import REQUEST_ID_HEADER
 
 
 def test_not_found_uses_error_envelope() -> None:
@@ -71,3 +76,36 @@ def test_http_exception_headers_are_preserved() -> None:
 
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_unhandled_failure_returns_safe_correlated_response(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    application = create_app(Settings(environment="test"))
+
+    @application.get("/unhandled-failure")
+    async def unhandled_failure() -> None:
+        raise RuntimeError("password=should-never-cross-the-error-boundary")
+
+    caplog.set_level(logging.ERROR, logger="app.errors")
+    with TestClient(application, raise_server_exceptions=False) as client:
+        response = client.get(
+            "/unhandled-failure",
+            headers={REQUEST_ID_HEADER: "attacker-controlled-value"},
+        )
+
+    request_id = response.headers[REQUEST_ID_HEADER]
+    assert response.status_code == 500
+    assert UUID(request_id).version == 4
+    assert request_id != "attacker-controlled-value"
+    assert response.json() == {
+        "error": {
+            "code": "internal_error",
+            "message": "Internal server error",
+            "details": None,
+        }
+    }
+    assert "should-never-cross-the-error-boundary" not in response.text
+    assert "should-never-cross-the-error-boundary" not in caplog.text
+    assert f"request_id={request_id}" in caplog.text
+    assert "error_category=internal_error" in caplog.text

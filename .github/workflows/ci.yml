@@ -102,7 +102,23 @@ jobs:
           docker compose run --rm api alembic upgrade head
 
       - name: Check API
-        run: curl --fail --show-error http://127.0.0.1:8000/health/live
+        run: |
+          curl --fail --show-error http://127.0.0.1:8000/health/live
+          curl --fail --show-error http://127.0.0.1:8000/health/ready
+
+      - name: Check readiness failure and recovery
+        run: |
+          docker compose exec -T api python -m scripts.smoke_readiness ready
+          docker compose stop redis
+          docker compose exec -T api python -m scripts.smoke_readiness dependency-failure
+          docker compose start redis
+          docker compose up --detach --wait --wait-timeout 120 redis api worker
+          docker compose exec -T api python -m scripts.smoke_readiness ready
+          docker compose stop postgres
+          docker compose exec -T api python -m scripts.smoke_readiness dependency-failure
+          docker compose start postgres
+          docker compose up --detach --wait --wait-timeout 120 postgres api worker
+          docker compose exec -T api python -m scripts.smoke_readiness ready
 
       - name: Check shared browser sessions
         run: docker compose run --rm api python -m scripts.smoke_ui_session
