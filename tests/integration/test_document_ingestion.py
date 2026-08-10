@@ -401,7 +401,7 @@ def test_transient_scanner_failure_retries_then_reaches_ready(
     task_name = f"supportflow.documents.ingest.transient.{uuid4().hex}"
     task = register_document_ingestion_task(
         application,
-        service,
+        lambda: service,
         max_retries=1,
         soft_time_limit=60,
         hard_time_limit=75,
@@ -559,7 +559,7 @@ def test_retry_exhaustion_via_celery_task_reaches_safe_failed_state(
     task_name = f"supportflow.documents.ingest.exhausted.{uuid4().hex}"
     task = register_document_ingestion_task(
         application,
-        service,
+        lambda: service,
         max_retries=1,
         soft_time_limit=60,
         hard_time_limit=75,

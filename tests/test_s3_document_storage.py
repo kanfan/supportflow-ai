@@ -161,12 +161,16 @@ def test_s3_client_uses_bounded_retries_without_explicit_credentials(
     captured: dict[str, object] = {}
     sentinel = cast(S3Client, object())
 
-    def fake_client(service_name: str, **kwargs: object) -> object:
-        captured["service_name"] = service_name
-        captured.update(kwargs)
-        return sentinel
+    class FakeSession:
+        def client(self, service_name: str, **kwargs: object) -> object:
+            captured["service_name"] = service_name
+            captured.update(kwargs)
+            return sentinel
 
-    monkeypatch.setattr("app.documents.s3_storage.boto3.client", fake_client)
+    monkeypatch.setattr(
+        "app.documents.s3_storage.Boto3Session",
+        FakeSession,
+    )
 
     client = build_s3_client(
         region_name="eu-central-1",

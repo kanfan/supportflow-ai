@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import BinaryIO, Protocol, cast
 
-import boto3
+from boto3.session import Session as Boto3Session
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -50,7 +50,8 @@ def build_s3_client(
 ) -> S3Client:
     """Build an S3 client that relies on the standard ECS task-role chain."""
 
-    client = boto3.client(
+    session = Boto3Session()
+    client = session.client(
         "s3",
         region_name=region_name,
         endpoint_url=endpoint_url,
