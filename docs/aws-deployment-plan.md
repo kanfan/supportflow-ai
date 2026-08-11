@@ -95,7 +95,8 @@ the complete handoff.
 Complete before the AWS alpha:
 
 - [ ] Add `/health/ready` for database and required Redis reachability.
-- [ ] Add an S3 storage adapter behind the document storage interface.
+- [ ] Integrate the locally tested S3 storage adapter with the #37 private bucket
+      and ECS task role, then record live staging evidence.
 - [ ] Replace process-local browser sessions with an ElastiCache-backed store,
       including TTL, rotation, invalidation, and replay tests.
 - [ ] Configure PostgreSQL and ElastiCache TLS URLs.

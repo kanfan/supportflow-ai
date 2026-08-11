@@ -1,16 +1,14 @@
 from collections.abc import Callable
 
 from celery import Celery
+from celery.signals import worker_process_init, worker_process_shutdown
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.documents.composition import resolve_document_safety_scanner
-from app.documents.extraction import DocumentExtractorRegistry, ExtractionLimits
-from app.documents.ingestion import DocumentIngestionService
+from app.documents.extraction import DocumentExtractorRegistry
 from app.documents.ports import DocumentSafetyScanner, DocumentStorage
-from app.documents.storage import LocalDocumentStorage
 from app.documents.tasks import register_document_ingestion_task
-from app.infrastructure.database import build_engine, build_session_factory
+from app.documents.worker_runtime import DocumentWorkerRuntime
 
 
 HEALTH_TASK_NAME = "supportflow.health.ping"
@@ -56,42 +54,24 @@ def create_celery(
     document_extractors: DocumentExtractorRegistry | None = None,
 ) -> Celery:
     resolved_settings = settings or get_settings()
-    resolved_scanner = resolve_document_safety_scanner(
+    worker_runtime = DocumentWorkerRuntime(
         resolved_settings,
-        document_safety_scanner,
-    )
-    resolved_storage = document_storage or LocalDocumentStorage(
-        resolved_settings.document_storage_root
-    )
-    if session_factory is None:
-        engine = build_engine(
-            resolved_settings.database_url,
-            connect_timeout_seconds=(
-                resolved_settings.dependency_connect_timeout_seconds
-            ),
-        )
-        resolved_session_factory: Callable[[], Session] = build_session_factory(engine)
-    else:
-        resolved_session_factory = session_factory
-    ingestion_service = DocumentIngestionService(
-        resolved_session_factory,
-        storage=resolved_storage,
-        scanner=resolved_scanner,
-        extractors=document_extractors or DocumentExtractorRegistry(),
-        limits=ExtractionLimits(
-            max_pdf_pages=resolved_settings.document_max_pdf_pages,
-            max_characters=resolved_settings.document_max_extracted_characters,
-        ),
+        document_safety_scanner=document_safety_scanner,
+        document_storage=document_storage,
+        session_factory=session_factory,
+        document_extractors=document_extractors,
     )
     application = create_celery_client(resolved_settings)
     application.task(name=HEALTH_TASK_NAME)(health_ping)
     register_document_ingestion_task(
         application,
-        ingestion_service,
+        worker_runtime.get_service,
         max_retries=resolved_settings.document_ingestion_max_retries,
         soft_time_limit=(resolved_settings.document_ingestion_soft_time_limit_seconds),
         hard_time_limit=(resolved_settings.document_ingestion_hard_time_limit_seconds),
     )
+    worker_process_init.connect(worker_runtime.initialize_child, weak=False)
+    worker_process_shutdown.connect(worker_runtime.shutdown_child, weak=False)
     return application
 
 

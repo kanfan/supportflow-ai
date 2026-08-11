@@ -1,12 +1,53 @@
 from app.config import Settings
 from app.documents.ports import (
     DocumentSafetyScanner,
+    DocumentStorage,
     FakeDocumentSafetyScanner,
 )
+from app.documents.s3_storage import S3DocumentStorage, build_s3_client
+from app.documents.storage import LocalDocumentStorage
 
 
 class DocumentScannerConfigurationError(RuntimeError):
     """Raised when scanner configuration does not match a usable adapter."""
+
+
+class DocumentStorageConfigurationError(RuntimeError):
+    """Raised when storage configuration cannot produce a usable adapter."""
+
+
+def resolve_document_storage(
+    settings: Settings,
+    configured_storage: DocumentStorage | None,
+) -> DocumentStorage:
+    if configured_storage is not None:
+        return configured_storage
+    if settings.document_storage_mode == "local":
+        return LocalDocumentStorage(settings.document_storage_root)
+    if settings.document_s3_bucket is None or settings.document_s3_region is None:
+        raise DocumentStorageConfigurationError(
+            "S3 storage requires bucket and region configuration"
+        )
+
+    endpoint_url = (
+        settings.document_s3_endpoint_url.strip()
+        if settings.document_s3_endpoint_url
+        and settings.document_s3_endpoint_url.strip()
+        else None
+    )
+    client = build_s3_client(
+        region_name=settings.document_s3_region.strip(),
+        endpoint_url=endpoint_url,
+        connect_timeout_seconds=settings.dependency_connect_timeout_seconds,
+        read_timeout_seconds=settings.document_s3_read_timeout_seconds,
+        total_max_attempts=settings.document_s3_total_max_attempts,
+    )
+    return S3DocumentStorage(client, settings.document_s3_bucket.strip())
+
+
+def close_document_storage(storage: DocumentStorage) -> None:
+    if isinstance(storage, S3DocumentStorage):
+        storage.close()
 
 
 def resolve_document_safety_scanner(

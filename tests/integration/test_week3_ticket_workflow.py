@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.audit.models import AuditAction, AuditEvent
 from app.config import Settings
 from app.documents.ports import DocumentScanResult
+from app.documents.storage import InMemoryDocumentStorage
 from app.main import create_app
 from app.tickets.models import Customer, Ticket, TicketMessage, TicketStatus
 from app.ui.session import UI_SESSION_COOKIE
@@ -545,8 +546,12 @@ def test_production_like_ui_cookie_is_secure(migrated_database_url: str) -> None
             auth_issuer="supportflow-week3-staging-test",
             auth_audience="supportflow-week3-staging-api",
             document_scanner_mode="external",
+            document_storage_mode="s3",
+            document_s3_bucket="supportflow-staging-test-documents",
+            document_s3_region="eu-central-1",
         ),
         document_safety_scanner=StagingDocumentScanner(),
+        document_storage=InMemoryDocumentStorage(),
     )
     with TestClient(application, base_url="https://testserver") as client:
         response = client.get("/ui/login")

@@ -28,7 +28,7 @@ def test_ingestion_task_policy_is_late_acknowledged_bounded_and_resultless() -> 
     service = RecordingIngestionService()
     task = register_document_ingestion_task(
         application,
-        cast(DocumentIngestionService, service),
+        lambda: cast(DocumentIngestionService, service),
         max_retries=3,
         soft_time_limit=60,
         hard_time_limit=75,
@@ -52,7 +52,7 @@ def test_ingestion_task_accepts_only_one_version_uuid() -> None:
     service = RecordingIngestionService()
     task = register_document_ingestion_task(
         application,
-        cast(DocumentIngestionService, service),
+        lambda: cast(DocumentIngestionService, service),
         max_retries=3,
         soft_time_limit=60,
         hard_time_limit=75,
@@ -66,6 +66,39 @@ def test_ingestion_task_accepts_only_one_version_uuid() -> None:
     assert service.processed == [(version_id, "delivery-one")]
     assert invalid.successful()
     assert invalid.result is None
+
+
+def test_ingestion_task_resolves_its_service_when_each_delivery_runs() -> None:
+    application = Celery("document-task-service-provider", broker="memory://")
+    application.conf.task_always_eager = True
+    first_service = RecordingIngestionService()
+    second_service = RecordingIngestionService()
+    services = [first_service, second_service]
+    provider_calls = 0
+
+    def provide_service() -> DocumentIngestionService:
+        nonlocal provider_calls
+        service = services[provider_calls]
+        provider_calls += 1
+        return cast(DocumentIngestionService, service)
+
+    task = register_document_ingestion_task(
+        application,
+        provide_service,
+        max_retries=3,
+        soft_time_limit=60,
+        hard_time_limit=75,
+        task_name=f"{INGEST_DOCUMENT_VERSION_TASK}.provider",
+    )
+    first_version_id = uuid4()
+    second_version_id = uuid4()
+
+    task.apply(args=[str(first_version_id)], task_id="delivery-one")
+    task.apply(args=[str(second_version_id)], task_id="delivery-two")
+
+    assert provider_calls == 2
+    assert first_service.processed == [(first_version_id, "delivery-one")]
+    assert second_service.processed == [(second_version_id, "delivery-two")]
 
 
 def test_retry_backoff_is_exponential_jittered_and_capped() -> None:

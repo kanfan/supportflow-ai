@@ -39,7 +39,13 @@ class Settings(BaseSettings):
     auth_audience: str = "supportflow-api"
     access_token_ttl_minutes: int = Field(default=15, ge=1, le=1440)
     ui_session_ttl_minutes: int = Field(default=480, ge=5, le=1440)
+    document_storage_mode: Literal["local", "s3"] = "local"
     document_storage_root: Path = Path(".supportflow/documents")
+    document_s3_bucket: str | None = None
+    document_s3_region: str | None = None
+    document_s3_endpoint_url: str | None = None
+    document_s3_read_timeout_seconds: int = Field(default=30, ge=1, le=120)
+    document_s3_total_max_attempts: int = Field(default=3, ge=1, le=10)
     document_max_upload_bytes: int = Field(
         default=10 * 1024 * 1024,
         ge=1,
@@ -85,6 +91,33 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "SUPPORTFLOW_DOCUMENT_SCANNER_MODE must not be fake outside local/test"
+            )
+        if (
+            self.environment in {"staging", "production"}
+            and self.document_storage_mode != "s3"
+        ):
+            raise ValueError(
+                "SUPPORTFLOW_DOCUMENT_STORAGE_MODE must be s3 outside local/test"
+            )
+        if self.document_storage_mode == "s3" and (
+            not self.document_s3_bucket or not self.document_s3_bucket.strip()
+        ):
+            raise ValueError(
+                "SUPPORTFLOW_DOCUMENT_S3_BUCKET is required for S3 storage"
+            )
+        if self.document_storage_mode == "s3" and (
+            not self.document_s3_region or not self.document_s3_region.strip()
+        ):
+            raise ValueError(
+                "SUPPORTFLOW_DOCUMENT_S3_REGION is required for S3 storage"
+            )
+        if (
+            self.environment in {"staging", "production"}
+            and self.document_s3_endpoint_url is not None
+            and not self.document_s3_endpoint_url.strip().startswith("https://")
+        ):
+            raise ValueError(
+                "SUPPORTFLOW_DOCUMENT_S3_ENDPOINT_URL must use HTTPS outside local/test"
             )
         if self.document_fake_scanner_gate_path is not None and (
             self.environment not in {"local", "test"}

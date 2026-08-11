@@ -14,14 +14,17 @@ from app.api.organization_members import router as organization_members_router
 from app.api.tickets import router as tickets_router
 from app.auth.security import AccessTokenManager, PasswordManager
 from app.config import Settings, get_settings
-from app.documents.composition import resolve_document_safety_scanner
+from app.documents.composition import (
+    close_document_storage,
+    resolve_document_safety_scanner,
+    resolve_document_storage,
+)
 from app.documents.dispatch import CeleryDocumentTaskDispatcher
 from app.documents.ports import (
     DocumentSafetyScanner,
     DocumentStorage,
     DocumentTaskDispatcher,
 )
-from app.documents.storage import LocalDocumentStorage
 from app.errors import install_error_handlers
 from app.infrastructure.database import build_engine, build_session_factory
 from app.infrastructure.readiness import (
@@ -58,6 +61,10 @@ def create_app(
         resolved_settings,
         document_safety_scanner,
     )
+    resolved_document_storage = resolve_document_storage(
+        resolved_settings,
+        document_storage,
+    )
     engine = build_engine(
         resolved_settings.database_url,
         connect_timeout_seconds=(resolved_settings.dependency_connect_timeout_seconds),
@@ -76,6 +83,7 @@ def create_app(
             yield
         finally:
             engine.dispose()
+            close_document_storage(resolved_document_storage)
             if resolved_redis_client is not None:
                 resolved_redis_client.close()
 
@@ -89,11 +97,7 @@ def create_app(
     application.state.settings = resolved_settings
     application.state.session_factory = session_factory
     application.state.document_safety_scanner = resolved_document_safety_scanner
-    application.state.document_storage = (
-        document_storage
-        if document_storage is not None
-        else LocalDocumentStorage(resolved_settings.document_storage_root)
-    )
+    application.state.document_storage = resolved_document_storage
     application.state.document_task_dispatcher = (
         document_task_dispatcher
         if document_task_dispatcher is not None

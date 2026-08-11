@@ -411,9 +411,14 @@ checks the extension against the content, and never uses that filename as an
 object key.
 
 The object key is generated from tenant, document, and version UUIDs. Local
-development stores objects under the private `.supportflow/documents` directory;
-the `DocumentStorage` boundary allows AWS deployment to replace that adapter with
-private S3 without changing the service. Responses and logs omit object keys,
+development stores objects under the private `.supportflow/documents` directory.
+The Week 5 `S3DocumentStorage` adapter implements the same `DocumentStorage`
+contract with private S3 streaming operations and stable provider-error mapping.
+The API and worker select the same adapter through
+`SUPPORTFLOW_DOCUMENT_STORAGE_MODE`; staging and production reject local storage.
+S3 credentials are never application settings: the SDK uses the ECS task role,
+while bucket encryption, public-access blocking, versioning, lifecycle, and IAM
+remain #37 platform controls. Responses and logs omit bucket/object identifiers,
 hashes, document bodies, extracted text, and internal exception messages.
 
 After storage succeeds, the document, version `1`, and allowlisted
@@ -431,9 +436,11 @@ same `404`.
 The scanner interface and fail-closed environment guard are present. The fake
 scanner is allowed only for local/test environments. The `external`
 configuration label alone is not sufficient: staging/production startup
-requires a concrete non-fake scanner adapter. Worker-side extraction,
+requires a concrete non-fake scanner adapter. The S3 adapter has deterministic
+SDK contract tests; live bucket/task-role evidence waits for the sanitized #37
+handoff. Worker-side extraction,
 retry/idempotency behavior, terminal audit atomicity, and status transitions are
-implemented on `main`; the production-like scanner adapter and live S3
+implemented on `main`; the production-like scanner adapter and live AWS
 integration remain Week 5 application work under #38.
 
 ### Database migrations

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import random
+from collections.abc import Callable
 from typing import Any, cast
 from uuid import UUID
 
@@ -41,7 +42,7 @@ def retry_countdown(retry_number: int, *, jitter: float | None = None) -> int:
 
 def register_document_ingestion_task(
     application: Celery,
-    service: DocumentIngestionService,
+    service_provider: Callable[[], DocumentIngestionService],
     *,
     max_retries: int,
     soft_time_limit: int,
@@ -72,6 +73,7 @@ def register_document_ingestion_task(
             return
 
         task_id = str(task.request.id or "unknown")
+        service = service_provider()
         try:
             service.process(version_id, task_id)
         except RetryableIngestionError as exc:
