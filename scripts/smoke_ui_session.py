@@ -29,7 +29,7 @@ def main() -> None:
         raise RuntimeError("UI session smoke received an unexpected cookie")
 
     redis_client = build_redis_client(
-        settings.redis_url,
+        settings.redis_url.get_secret_value(),
         timeout_seconds=settings.dependency_connect_timeout_seconds,
     )
     independent_store = RedisBrowserSessionStore(

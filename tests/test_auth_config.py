@@ -6,22 +6,102 @@ from pydantic import SecretStr, ValidationError
 from app.config import Settings
 
 
+SECURE_REDIS_URL = "rediss://default:not-a-real-secret@cache.internal:6379/0"
+SECURE_CELERY_BROKER_URL = "rediss://default:not-a-real-secret@cache.internal:6379/1"
+SECURE_CELERY_BACKEND_URL = "rediss://default:not-a-real-secret@cache.internal:6379/2"
+
+
+def deployed_settings(**overrides: object) -> Settings:
+    values: dict[str, object] = {
+        "environment": "production",
+        "auth_secret_key": SecretStr("x" * 32),
+        "document_scanner_mode": "external",
+        "document_storage_mode": "s3",
+        "document_s3_bucket": "supportflow-production-documents",
+        "document_s3_region": "eu-central-1",
+        "redis_url": SECURE_REDIS_URL,
+        "celery_broker_url": SECURE_CELERY_BROKER_URL,
+        "celery_result_backend_url": SECURE_CELERY_BACKEND_URL,
+    }
+    values.update(overrides)
+    return Settings.model_validate(values)
+
+
 def test_deployed_environment_rejects_development_auth_secret() -> None:
     with pytest.raises(ValidationError, match="AUTH_SECRET_KEY"):
         Settings(environment="production")
 
 
 def test_deployed_environment_accepts_explicit_auth_secret() -> None:
-    settings = Settings(
-        environment="production",
-        auth_secret_key=SecretStr("x" * 32),
-        document_scanner_mode="external",
-        document_storage_mode="s3",
-        document_s3_bucket="supportflow-production-documents",
-        document_s3_region="eu-central-1",
-    )
+    settings = deployed_settings()
 
     assert settings.auth_secret_key.get_secret_value() == "x" * 32
+
+
+@pytest.mark.parametrize(
+    "setting_name",
+    ["redis_url", "celery_broker_url", "celery_result_backend_url"],
+)
+def test_deployed_redis_dependencies_require_tls(setting_name: str) -> None:
+    with pytest.raises(ValidationError, match=setting_name.upper()):
+        deployed_settings(
+            **{setting_name: "redis://default:secret@cache.internal:6379/0"}
+        )
+
+
+@pytest.mark.parametrize(
+    ("setting_name", "unsafe_query", "expected_error"),
+    [
+        ("redis_url", "ssl_cert_reqs=none", "certificate verification"),
+        (
+            "celery_broker_url",
+            "ssl_cert_reqs=optional",
+            "certificate verification",
+        ),
+        (
+            "celery_result_backend_url",
+            "ssl_check_hostname=false",
+            "hostname verification",
+        ),
+    ],
+)
+def test_deployed_redis_dependencies_reject_weakened_tls_options(
+    setting_name: str,
+    unsafe_query: str,
+    expected_error: str,
+) -> None:
+    with pytest.raises(ValidationError, match=expected_error):
+        deployed_settings(
+            **{
+                setting_name: (
+                    f"rediss://default:secret@cache.internal:6379/0?{unsafe_query}"
+                )
+            }
+        )
+
+
+def test_connection_urls_are_redacted_from_settings_representation() -> None:
+    canary = "connection-password-canary"
+    settings = Settings(
+        environment="test",
+        redis_url=SecretStr(f"redis://default:{canary}@cache.internal:6379/0"),
+        celery_broker_url=SecretStr(f"redis://default:{canary}@cache.internal:6379/1"),
+        celery_result_backend_url=SecretStr(
+            f"redis://default:{canary}@cache.internal:6379/2"
+        ),
+    )
+
+    assert canary not in repr(settings)
+    assert settings.redis_url.get_secret_value().startswith("redis://")
+
+
+def test_deployed_tls_validation_error_does_not_echo_connection_secret() -> None:
+    canary = "tls-validation-password-canary"
+
+    with pytest.raises(ValidationError) as captured:
+        deployed_settings(redis_url=f"redis://default:{canary}@cache.internal:6379/0")
+
+    assert canary not in str(captured.value)
 
 
 def test_deployed_environment_rejects_fake_document_scanner() -> None:

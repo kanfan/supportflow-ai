@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import ssl
 
 from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown
@@ -22,10 +23,12 @@ def create_celery_client(settings: Settings | None = None) -> Celery:
     """Create a publish-only client without composing worker dependencies."""
 
     resolved_settings = settings or get_settings()
+    broker_url = resolved_settings.celery_broker_url.get_secret_value()
+    result_backend_url = resolved_settings.celery_result_backend_url.get_secret_value()
     application = Celery(
         "supportflow",
-        broker=resolved_settings.celery_broker_url,
-        backend=resolved_settings.celery_result_backend_url,
+        broker=broker_url,
+        backend=result_backend_url,
     )
     application.conf.update(
         accept_content=["json"],
@@ -42,6 +45,15 @@ def create_celery_client(settings: Settings | None = None) -> Celery:
         },
         visibility_timeout=resolved_settings.celery_visibility_timeout_seconds,
     )
+    if resolved_settings.environment in {"staging", "production"}:
+        application.conf.broker_use_ssl = {
+            "ssl_cert_reqs": ssl.CERT_REQUIRED,
+            "ssl_check_hostname": True,
+        }
+        application.conf.redis_backend_use_ssl = {
+            "ssl_cert_reqs": ssl.CERT_REQUIRED,
+            "ssl_check_hostname": True,
+        }
     return application
 
 

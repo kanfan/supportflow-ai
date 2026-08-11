@@ -73,7 +73,7 @@ def create_app(
     resolved_redis_client = redis_client
     if resolved_redis_client is None and resolved_settings.environment != "test":
         resolved_redis_client = build_redis_client(
-            resolved_settings.redis_url,
+            resolved_settings.redis_url.get_secret_value(),
             timeout_seconds=resolved_settings.dependency_connect_timeout_seconds,
         )
 

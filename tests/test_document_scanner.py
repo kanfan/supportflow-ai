@@ -39,6 +39,11 @@ def production_settings(storage_root: Path) -> Settings:
         document_s3_bucket="supportflow-production-documents",
         document_s3_region="eu-central-1",
         document_storage_root=storage_root,
+        redis_url=SecretStr("rediss://default:test@cache.internal:6379/0"),
+        celery_broker_url=SecretStr("rediss://default:test@cache.internal:6379/1"),
+        celery_result_backend_url=SecretStr(
+            "rediss://default:test@cache.internal:6379/2"
+        ),
     )
 
 

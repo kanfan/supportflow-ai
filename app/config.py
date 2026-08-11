@@ -1,12 +1,36 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
+from urllib.parse import parse_qs, urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 DEVELOPMENT_AUTH_SECRET = "development-only-secret-change-before-production"
+
+
+def _require_verified_redis_tls(setting_name: str, value: SecretStr) -> None:
+    """Reject deployed Redis URLs that can bypass transport verification."""
+
+    parsed = urlsplit(value.get_secret_value())
+    if parsed.scheme.lower() != "rediss" or parsed.hostname is None:
+        raise ValueError(
+            f"SUPPORTFLOW_{setting_name} must use rediss:// with a hostname "
+            "outside local/test"
+        )
+
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    certificate_modes = [item.lower() for item in query.get("ssl_cert_reqs", [])]
+    if certificate_modes and certificate_modes != ["required"]:
+        raise ValueError(
+            f"SUPPORTFLOW_{setting_name} must require Redis certificate verification"
+        )
+    hostname_modes = [item.lower() for item in query.get("ssl_check_hostname", [])]
+    if hostname_modes and hostname_modes != ["true"]:
+        raise ValueError(
+            f"SUPPORTFLOW_{setting_name} must require Redis hostname verification"
+        )
 
 
 class Settings(BaseSettings):
@@ -25,10 +49,10 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+psycopg://supportflow:supportflow@localhost:5432/supportflow"
     )
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: SecretStr = SecretStr("redis://localhost:6379/0")
     dependency_connect_timeout_seconds: int = Field(default=2, ge=1, le=10)
-    celery_broker_url: str = "redis://localhost:6379/0"
-    celery_result_backend_url: str = "redis://localhost:6379/1"
+    celery_broker_url: SecretStr = SecretStr("redis://localhost:6379/0")
+    celery_result_backend_url: SecretStr = SecretStr("redis://localhost:6379/1")
     celery_visibility_timeout_seconds: int = Field(
         default=180,
         ge=5,
@@ -140,6 +164,16 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "Celery visibility timeout must exceed the ingestion hard time limit"
+            )
+        if self.environment in {"staging", "production"}:
+            _require_verified_redis_tls("REDIS_URL", self.redis_url)
+            _require_verified_redis_tls(
+                "CELERY_BROKER_URL",
+                self.celery_broker_url,
+            )
+            _require_verified_redis_tls(
+                "CELERY_RESULT_BACKEND_URL",
+                self.celery_result_backend_url,
             )
         return self
 

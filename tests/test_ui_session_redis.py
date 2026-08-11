@@ -4,10 +4,18 @@ import os
 from typing import cast
 from uuid import uuid4
 
+from fastapi.testclient import TestClient
 import pytest
 from redis import Redis
 
-from app.ui.session import RedisBrowserSessionStore, RedisSessionClient
+from app.config import Settings
+from app.infrastructure.readiness import AlwaysReadyProbe
+from app.main import create_app
+from app.ui.session import (
+    RedisBrowserSessionStore,
+    RedisSessionClient,
+    UI_SESSION_COOKIE,
+)
 
 
 @pytest.fixture
@@ -24,6 +32,20 @@ def redis_session_client() -> Iterator[Redis]:
     client.ping()
     yield client
     client.close()
+
+
+def redis_client_from_environment() -> Redis:
+    redis_url = os.getenv("SUPPORTFLOW_TEST_REDIS_URL")
+    if not redis_url:
+        pytest.skip("SUPPORTFLOW_TEST_REDIS_URL is not configured")
+    client = Redis.from_url(
+        redis_url,
+        decode_responses=True,
+        socket_connect_timeout=2,
+        socket_timeout=2,
+    )
+    client.ping()
+    return client
 
 
 @pytest.mark.integration
@@ -69,3 +91,37 @@ def test_two_store_instances_share_rotation_and_invalidation(
         keys = list(redis_session_client.scan_iter(match=f"{key_prefix}*"))
         if keys:
             redis_session_client.delete(*keys)
+
+
+@pytest.mark.integration
+def test_browser_session_survives_api_application_replacement() -> None:
+    first_redis_client = redis_client_from_environment()
+    first_application = create_app(
+        Settings(environment="test"),
+        redis_client=first_redis_client,
+        readiness_probe=AlwaysReadyProbe(),
+    )
+
+    with TestClient(first_application) as first_api:
+        response = first_api.get("/ui/login")
+        assert response.status_code == 200
+        cookie_value = first_api.cookies.get(UI_SESSION_COOKIE)
+        assert cookie_value is not None
+
+    second_redis_client = redis_client_from_environment()
+    second_application = create_app(
+        Settings(environment="test"),
+        redis_client=second_redis_client,
+        readiness_probe=AlwaysReadyProbe(),
+    )
+    with TestClient(second_application):
+        replacement_store = cast(
+            RedisBrowserSessionStore,
+            second_application.state.browser_session_store,
+        )
+        try:
+            restored_session = replacement_store.resolve(cookie_value)
+            assert restored_session is not None
+            assert restored_session.is_authenticated is False
+        finally:
+            replacement_store.invalidate(cookie_value)
