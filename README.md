@@ -531,7 +531,7 @@ Install the Git hook once with `uv run pre-commit install`. GitHub Actions repea
 
 ## Documentation
 
-The complete AWS-aligned project plan (revision 1.2) is available in
+The complete AWS-aligned project plan (revision 1.3) is available in
 [SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf](./SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf).
 
 - [API conventions](./docs/api-conventions.md)
@@ -541,6 +541,7 @@ The complete AWS-aligned project plan (revision 1.2) is available in
 - [ADR 0004: AWS deployment platform](./docs/adr/0004-aws-deployment-platform.md)
 - [ADR 0005: Document ingestion and worker reliability contracts](./docs/adr/0005-document-ingestion-and-worker-reliability.md)
 - [ADR 0006: Week 5 AWS delivery ownership and handoff](./docs/adr/0006-week-5-aws-delivery-and-handoff.md)
+- [ADR 0007: Ephemeral AWS portfolio-evidence environment](./docs/adr/0007-ephemeral-aws-portfolio-evidence.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
 - [Week 5 AWS application handoff contract](./docs/aws-application-handoff-contract.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
