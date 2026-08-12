@@ -66,8 +66,9 @@ def create_app(
         document_storage,
     )
     engine = build_engine(
-        resolved_settings.database_url,
+        resolved_settings.database_url.get_secret_value(),
         connect_timeout_seconds=(resolved_settings.dependency_connect_timeout_seconds),
+        ssl_root_cert_path=resolved_settings.database_ssl_root_cert_path,
     )
     session_factory = build_session_factory(engine)
     resolved_redis_client = redis_client

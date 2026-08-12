@@ -61,10 +61,11 @@ class DocumentWorkerRuntime:
         try:
             if self._configured_session_factory is None:
                 owned_engine = build_engine(
-                    self._settings.database_url,
+                    self._settings.database_url.get_secret_value(),
                     connect_timeout_seconds=(
                         self._settings.dependency_connect_timeout_seconds
                     ),
+                    ssl_root_cert_path=(self._settings.database_ssl_root_cert_path),
                 )
                 resolved_session_factory: Callable[[], Session] = build_session_factory(
                     owned_engine

@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from io import BytesIO
+from pathlib import Path
 from typing import cast
 
 import pytest
@@ -95,8 +96,10 @@ def test_each_worker_process_replaces_inherited_resources_and_closes_its_own(
         _database_url: str,
         *,
         connect_timeout_seconds: int,
+        ssl_root_cert_path: Path | None,
     ) -> Engine:
         assert connect_timeout_seconds == 2
+        assert ssl_root_cert_path is None
         engine = RecordingEngine()
         engines.append(engine)
         return cast(Engine, engine)
