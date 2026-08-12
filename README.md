@@ -378,6 +378,14 @@ connection URLs are secret-valued settings so passwords are omitted from configu
 representations. Live ElastiCache TLS and ECS task-replacement evidence remain
 part of #38/#40.
 
+Database URLs are also secret-valued settings. Staging and production require
+the `postgresql+psycopg` driver, a database hostname, and an explicit
+`SUPPORTFLOW_DATABASE_SSL_ROOT_CERT_PATH`. The shared engine builder forces
+`sslmode=verify-full` and passes the trusted CA path to API, worker, readiness,
+smoke, and migration connections. Local Compose remains plaintext and
+deterministic; live RDS certificate delivery and verification remain #37/#40
+evidence.
+
 ### Membership and audit flow
 
 An authenticated organization `admin` can list memberships and add an existing,

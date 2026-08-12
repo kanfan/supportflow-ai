@@ -3,13 +3,12 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-
+from sqlalchemy import pool
 from app.audit import models as audit_models  # noqa: F401
 from app.config import get_settings
 from app.documents import models as document_models  # noqa: F401
 from app.identity import models as identity_models  # noqa: F401
-from app.infrastructure.database import Base
+from app.infrastructure.database import Base, build_engine
 from app.tickets import models as ticket_models  # noqa: F401
 
 
@@ -25,7 +24,12 @@ def resolve_database_url() -> str:
     configured_url = config.get_main_option("sqlalchemy.url")
     if configured_url:
         return configured_url
-    return get_settings().database_url
+    return get_settings().database_url.get_secret_value()
+
+
+def resolve_database_ssl_root_cert_path() -> str | None:
+    configured_path = get_settings().database_ssl_root_cert_path
+    return str(configured_path) if configured_path is not None else None
 
 
 def run_migrations_offline() -> None:
@@ -42,11 +46,9 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = resolve_database_url()
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    connectable = build_engine(
+        resolve_database_url(),
+        ssl_root_cert_path=resolve_database_ssl_root_cert_path(),
         poolclass=pool.NullPool,
     )
 

@@ -33,6 +33,7 @@ def test_fake_scanner_returns_the_configured_deterministic_result(
 def production_settings(storage_root: Path) -> Settings:
     return Settings(
         environment="production",
+        database_ssl_root_cert_path=Path("/app/certs/rds-ca-bundle.pem"),
         auth_secret_key=SecretStr("x" * 32),
         document_scanner_mode="external",
         document_storage_mode="s3",

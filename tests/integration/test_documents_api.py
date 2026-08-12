@@ -67,7 +67,7 @@ def document_harness(migrated_database_url: str) -> Iterator[DocumentHarness]:
     application = create_app(
         Settings(
             environment="test",
-            database_url=migrated_database_url,
+            database_url=SecretStr(migrated_database_url),
             auth_secret_key=SecretStr(TEST_AUTH_SECRET),
             auth_issuer="supportflow-document-integration-test",
             auth_audience="supportflow-api-document-integration-test",

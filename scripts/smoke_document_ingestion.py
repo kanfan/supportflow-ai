@@ -104,7 +104,10 @@ def verify_duplicate_noop(document_id: UUID, version_id: UUID) -> None:
         )
     wait_for_queue_empty()
 
-    engine = build_engine(settings.database_url)
+    engine = build_engine(
+        settings.database_url.get_secret_value(),
+        ssl_root_cert_path=settings.database_ssl_root_cert_path,
+    )
     try:
         with Session(engine) as session:
             version = session.get(DocumentVersion, version_id)

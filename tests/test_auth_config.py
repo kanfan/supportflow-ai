@@ -9,6 +9,10 @@ from app.config import Settings
 SECURE_REDIS_URL = "rediss://default:not-a-real-secret@cache.internal:6379/0"
 SECURE_CELERY_BROKER_URL = "rediss://default:not-a-real-secret@cache.internal:6379/1"
 SECURE_CELERY_BACKEND_URL = "rediss://default:not-a-real-secret@cache.internal:6379/2"
+SECURE_DATABASE_URL = (
+    "postgresql+psycopg://supportflow:not-a-real-secret@db.internal/supportflow"
+)
+DATABASE_CA_PATH = Path("/app/certs/rds-ca-bundle.pem")
 
 
 def deployed_settings(**overrides: object) -> Settings:
@@ -19,6 +23,8 @@ def deployed_settings(**overrides: object) -> Settings:
         "document_storage_mode": "s3",
         "document_s3_bucket": "supportflow-production-documents",
         "document_s3_region": "eu-central-1",
+        "database_url": SECURE_DATABASE_URL,
+        "database_ssl_root_cert_path": DATABASE_CA_PATH,
         "redis_url": SECURE_REDIS_URL,
         "celery_broker_url": SECURE_CELERY_BROKER_URL,
         "celery_result_backend_url": SECURE_CELERY_BACKEND_URL,
@@ -36,6 +42,68 @@ def test_deployed_environment_accepts_explicit_auth_secret() -> None:
     settings = deployed_settings()
 
     assert settings.auth_secret_key.get_secret_value() == "x" * 32
+
+
+def test_deployed_database_requires_explicit_ca_path() -> None:
+    with pytest.raises(ValidationError, match="DATABASE_SSL_ROOT_CERT_PATH"):
+        deployed_settings(database_ssl_root_cert_path=None)
+
+
+@pytest.mark.parametrize(
+    "database_url",
+    [
+        "postgresql+psycopg://supportflow:secret@db.internal/supportflow?sslmode=disable",
+        "postgresql+psycopg://supportflow:secret@db.internal/supportflow?sslmode=require",
+        "postgresql+psycopg://supportflow:secret@db.internal/supportflow?sslmode=verify-ca",
+    ],
+)
+def test_deployed_database_rejects_weakened_tls_modes(database_url: str) -> None:
+    with pytest.raises(ValidationError, match="certificate or hostname verification"):
+        deployed_settings(database_url=database_url)
+
+
+def test_deployed_database_rejects_ca_path_in_url() -> None:
+    with pytest.raises(ValidationError, match="DATABASE_SSL_ROOT_CERT_PATH"):
+        deployed_settings(
+            database_url=(
+                f"{SECURE_DATABASE_URL}?sslmode=verify-full&sslrootcert=/tmp/ca.pem"
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "database_url",
+    [
+        "sqlite:///supportflow.db",
+        "postgresql+psycopg:///supportflow",
+    ],
+)
+def test_deployed_database_requires_psycopg_and_hostname(database_url: str) -> None:
+    with pytest.raises(ValidationError, match=r"postgresql\+psycopg"):
+        deployed_settings(database_url=database_url)
+
+
+def test_database_url_is_redacted_from_settings_and_validation_errors() -> None:
+    canary = "database-password-canary"
+    settings = Settings(
+        environment="test",
+        database_url=SecretStr(
+            f"postgresql+psycopg://supportflow:{canary}@db.internal/supportflow"
+        ),
+    )
+
+    assert canary not in repr(settings)
+    assert canary in settings.database_url.get_secret_value()
+
+    with pytest.raises(ValidationError) as captured:
+        deployed_settings(
+            database_url=(
+                "postgresql+psycopg://supportflow:"
+                f"{canary}@db.internal/supportflow?sslmode=disable"
+            )
+        )
+
+    assert canary not in str(captured.value)
 
 
 @pytest.mark.parametrize(

@@ -33,6 +33,37 @@ def _require_verified_redis_tls(setting_name: str, value: SecretStr) -> None:
         )
 
 
+def _require_verified_database_tls(
+    database_url: SecretStr,
+    ssl_root_cert_path: Path | None,
+) -> None:
+    """Reject deployed PostgreSQL connections that can bypass verification."""
+
+    parsed = urlsplit(database_url.get_secret_value())
+    if parsed.scheme.lower() != "postgresql+psycopg" or parsed.hostname is None:
+        raise ValueError(
+            "SUPPORTFLOW_DATABASE_URL must use postgresql+psycopg:// with a "
+            "hostname outside local/test"
+        )
+
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    ssl_modes = [item.lower() for item in query.get("sslmode", [])]
+    if ssl_modes and ssl_modes != ["verify-full"]:
+        raise ValueError(
+            "SUPPORTFLOW_DATABASE_URL must not weaken PostgreSQL certificate "
+            "or hostname verification"
+        )
+    if "sslrootcert" in query:
+        raise ValueError(
+            "Configure the PostgreSQL CA through "
+            "SUPPORTFLOW_DATABASE_SSL_ROOT_CERT_PATH, not DATABASE_URL"
+        )
+    if ssl_root_cert_path is None or str(ssl_root_cert_path).strip() in {"", "."}:
+        raise ValueError(
+            "SUPPORTFLOW_DATABASE_SSL_ROOT_CERT_PATH is required outside local/test"
+        )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -46,9 +77,10 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: Literal["local", "test", "staging", "production"] = "local"
     debug: bool = False
-    database_url: str = (
+    database_url: SecretStr = SecretStr(
         "postgresql+psycopg://supportflow:supportflow@localhost:5432/supportflow"
     )
+    database_ssl_root_cert_path: Path | None = None
     redis_url: SecretStr = SecretStr("redis://localhost:6379/0")
     dependency_connect_timeout_seconds: int = Field(default=2, ge=1, le=10)
     celery_broker_url: SecretStr = SecretStr("redis://localhost:6379/0")
@@ -166,6 +198,10 @@ class Settings(BaseSettings):
                 "Celery visibility timeout must exceed the ingestion hard time limit"
             )
         if self.environment in {"staging", "production"}:
+            _require_verified_database_tls(
+                self.database_url,
+                self.database_ssl_root_cert_path,
+            )
             _require_verified_redis_tls("REDIS_URL", self.redis_url)
             _require_verified_redis_tls(
                 "CELERY_BROKER_URL",

@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 from datetime import timedelta
 import json
+from pathlib import Path
 import re
 from typing import Any, BinaryIO
 from uuid import UUID, uuid4
@@ -37,7 +38,7 @@ def workflow_client(migrated_database_url: str) -> Iterator[TestClient]:
     application = create_app(
         Settings(
             environment="test",
-            database_url=migrated_database_url,
+            database_url=SecretStr(migrated_database_url),
             auth_secret_key=SecretStr(TEST_AUTH_SECRET),
             auth_issuer="supportflow-week3-ticket-test",
             auth_audience="supportflow-week3-ticket-api",
@@ -542,7 +543,8 @@ def test_production_like_ui_cookie_is_secure(migrated_database_url: str) -> None
     application = create_app(
         Settings(
             environment="staging",
-            database_url=migrated_database_url,
+            database_url=SecretStr(migrated_database_url),
+            database_ssl_root_cert_path=Path("/app/certs/rds-ca-bundle.pem"),
             auth_secret_key=SecretStr(TEST_AUTH_SECRET),
             auth_issuer="supportflow-week3-staging-test",
             auth_audience="supportflow-week3-staging-api",

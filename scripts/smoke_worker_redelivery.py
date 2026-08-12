@@ -76,7 +76,10 @@ def prepare() -> None:
     document_id, version_id = register_and_upload()
 
     settings = get_settings()
-    engine = build_engine(settings.database_url)
+    engine = build_engine(
+        settings.database_url.get_secret_value(),
+        ssl_root_cert_path=settings.database_ssl_root_cert_path,
+    )
     try:
         deadline = monotonic() + TIMEOUT_SECONDS
         while monotonic() < deadline:
@@ -132,7 +135,10 @@ def verify() -> None:
             raise RuntimeError("Initial claim evidence is incoherent")
 
         settings = get_settings()
-        engine = build_engine(settings.database_url)
+        engine = build_engine(
+            settings.database_url.get_secret_value(),
+            ssl_root_cert_path=settings.database_ssl_root_cert_path,
+        )
         try:
             deadline = monotonic() + TIMEOUT_SECONDS
             while monotonic() < deadline:

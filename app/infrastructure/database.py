@@ -1,6 +1,10 @@
+from pathlib import Path
+from typing import Any
+
 from sqlalchemy import MetaData, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import Pool
 
 
 NAMING_CONVENTION = {
@@ -23,22 +27,34 @@ def build_engine(
     *,
     echo: bool = False,
     connect_timeout_seconds: int | None = None,
+    ssl_root_cert_path: str | Path | None = None,
+    poolclass: type[Pool] | None = None,
 ) -> Engine:
     """Create a synchronous SQLAlchemy engine for API or worker processes."""
 
-    if connect_timeout_seconds is None:
-        return create_engine(
-            database_url,
-            echo=echo,
-            pool_pre_ping=True,
+    connect_args: dict[str, object] = {}
+    if connect_timeout_seconds is not None:
+        connect_args["connect_timeout"] = connect_timeout_seconds
+    if ssl_root_cert_path is not None:
+        connect_args.update(
+            sslmode="verify-full",
+            sslrootcert=str(ssl_root_cert_path),
         )
+
+    engine_options: dict[str, Any] = {
+        "echo": echo,
+        "pool_pre_ping": True,
+    }
+    if connect_args:
+        engine_options["connect_args"] = connect_args
+    if connect_timeout_seconds is not None:
+        engine_options["pool_timeout"] = connect_timeout_seconds
+    if poolclass is not None:
+        engine_options["poolclass"] = poolclass
 
     return create_engine(
         database_url,
-        echo=echo,
-        pool_pre_ping=True,
-        connect_args={"connect_timeout": connect_timeout_seconds},
-        pool_timeout=connect_timeout_seconds,
+        **engine_options,
     )
 
 

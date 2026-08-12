@@ -1,4 +1,5 @@
 import ssl
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic import SecretStr
@@ -46,6 +47,7 @@ def test_celery_uses_configured_redis_urls() -> None:
 def test_deployed_celery_forces_full_redis_certificate_verification() -> None:
     settings = Settings(
         environment="staging",
+        database_ssl_root_cert_path=Path("/app/certs/rds-ca-bundle.pem"),
         auth_secret_key=SecretStr("staging-secret-with-at-least-thirty-two-bytes"),
         document_scanner_mode="external",
         document_storage_mode="s3",

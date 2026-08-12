@@ -42,7 +42,7 @@ def ticket_client(migrated_database_url: str) -> Iterator[TestClient]:
     application = create_app(
         Settings(
             environment="test",
-            database_url=migrated_database_url,
+            database_url=SecretStr(migrated_database_url),
             auth_secret_key=SecretStr(TEST_AUTH_SECRET),
             auth_issuer="supportflow-ticket-integration-test",
             auth_audience="supportflow-api-ticket-integration-test",
