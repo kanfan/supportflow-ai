@@ -126,7 +126,8 @@ accepted ownership and handoff contract in
 - [x] Duplicate/redelivered document tasks converge on one terminal result and audit event.
 - [x] API and worker containers share a private storage volume for local ingestion.
 - [x] A claimed `extracting` task survives worker `SIGKILL` and Redis redelivery without duplicate terminal effects.
-- [x] 202 automated tests with PostgreSQL/Redis integration and the Quality/Container smoke workflows pass on `main`.
+- [x] The full PostgreSQL/Redis suite and Quality/Container smoke workflows pass
+      on `main`; exact-head PR evidence records the current test count.
 
 ### Week 5 acceptance targets
 
@@ -370,8 +371,12 @@ Outside the test environment, sessions use Redis with a versioned
 `supportflow:ui-session` key namespace and server-side TTL. Rotation deletes the
 old session and creates the new session in one Redis transaction. Tests use the
 same storage contract with a deterministic in-memory adapter, and CI verifies
-cross-instance visibility against a real Redis service. Live ElastiCache TLS and
-API task-replacement evidence remain part of #38/#40.
+cross-instance visibility and application replacement against a real Redis
+service. Staging and production reject plaintext Redis/Celery URLs and force
+certificate plus hostname verification for `rediss://` connections. Redis
+connection URLs are secret-valued settings so passwords are omitted from configuration
+representations. Live ElastiCache TLS and ECS task-replacement evidence remain
+part of #38/#40.
 
 ### Membership and audit flow
 

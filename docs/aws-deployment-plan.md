@@ -99,7 +99,9 @@ Complete before the AWS alpha:
       and ECS task role, then record live staging evidence.
 - [ ] Replace process-local browser sessions with an ElastiCache-backed store,
       including TTL, rotation, invalidation, and replay tests.
-- [ ] Configure PostgreSQL and ElastiCache TLS URLs.
+- [ ] Consume the #37 PostgreSQL TLS/CA contract and record live verification.
+- [x] Require `rediss://` plus certificate/hostname verification in the API and
+      Celery application configuration; live ElastiCache evidence remains #40.
 - [ ] Confirm structured logs contain correlation IDs but no secrets, tokens,
       raw document bodies, or unnecessary PII.
 - [ ] Define API and worker task commands from the same image.

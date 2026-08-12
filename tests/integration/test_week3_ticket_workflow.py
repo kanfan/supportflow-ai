@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import timedelta
 import json
 import re
 from typing import Any, BinaryIO
@@ -17,7 +18,7 @@ from app.documents.ports import DocumentScanResult
 from app.documents.storage import InMemoryDocumentStorage
 from app.main import create_app
 from app.tickets.models import Customer, Ticket, TicketMessage, TicketStatus
-from app.ui.session import UI_SESSION_COOKIE
+from app.ui.session import InMemoryBrowserSessionStore, UI_SESSION_COOKIE
 
 
 pytestmark = pytest.mark.integration
@@ -549,9 +550,18 @@ def test_production_like_ui_cookie_is_secure(migrated_database_url: str) -> None
             document_storage_mode="s3",
             document_s3_bucket="supportflow-staging-test-documents",
             document_s3_region="eu-central-1",
+            redis_url=SecretStr("rediss://default:test@cache.internal:6379/0"),
+            celery_broker_url=SecretStr("rediss://default:test@cache.internal:6379/1"),
+            celery_result_backend_url=SecretStr(
+                "rediss://default:test@cache.internal:6379/2"
+            ),
         ),
         document_safety_scanner=StagingDocumentScanner(),
         document_storage=InMemoryDocumentStorage(),
+        browser_session_store=InMemoryBrowserSessionStore(
+            secret_key=TEST_AUTH_SECRET,
+            lifetime=timedelta(minutes=5),
+        ),
     )
     with TestClient(application, base_url="https://testserver") as client:
         response = client.get("/ui/login")

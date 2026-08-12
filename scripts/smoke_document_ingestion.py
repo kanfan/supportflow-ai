@@ -83,7 +83,7 @@ def wait_for_terminal(
 
 def wait_for_queue_empty() -> None:
     settings = get_settings()
-    queue = Redis.from_url(settings.celery_broker_url)
+    queue = Redis.from_url(settings.celery_broker_url.get_secret_value())
     deadline = monotonic() + TIMEOUT_SECONDS
     while monotonic() < deadline:
         if queue.llen("celery") == 0:

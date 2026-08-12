@@ -3,6 +3,7 @@ from io import BytesIO
 from typing import cast
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -44,8 +45,8 @@ def s3_settings() -> Settings:
         document_storage_mode="s3",
         document_s3_bucket="supportflow-test-documents",
         document_s3_region="eu-central-1",
-        celery_broker_url="memory://",
-        celery_result_backend_url="cache+memory://",
+        celery_broker_url=SecretStr("memory://"),
+        celery_result_backend_url=SecretStr("cache+memory://"),
     )
 
 
