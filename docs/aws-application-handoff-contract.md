@@ -73,8 +73,10 @@ on-demand rates observed on 2026-08-12 (`$0.04656` per vCPU-hour and
 hours or `$17.31` at eight hours per day for 30 days, before logs and network
 usage.
 
-The staging environment must therefore follow the 48-hour idle teardown rule,
-the USD 120 account budget, and the documented actual/forecast alerts. A
+The staging environment must therefore run only for a planned portfolio
+verification window, follow the USD 10/25/50 early notifications and USD 120
+emergency account ceiling, and be destroyed within 24 hours after acceptance
+evidence is captured. The 48-hour idle teardown rule remains a backstop. A
 reviewed plan must recalculate the whole-environment estimate before apply.
 
 ## RDS PostgreSQL connection contract
