@@ -533,6 +533,7 @@ The complete AWS-aligned project plan (revision 1.2) is available in
 - [ADR 0005: Document ingestion and worker reliability contracts](./docs/adr/0005-document-ingestion-and-worker-reliability.md)
 - [ADR 0006: Week 5 AWS delivery ownership and handoff](./docs/adr/0006-week-5-aws-delivery-and-handoff.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
+- [Week 5 AWS application handoff contract](./docs/aws-application-handoff-contract.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 - [Week 3 threat model](./docs/security/week-3-threat-model.md)
 - [Week 3 release verification](./docs/reviews/week-3-verification.md)

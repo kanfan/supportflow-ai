@@ -107,6 +107,13 @@ Complete before the AWS alpha:
 - [ ] Confirm structured logs contain correlation IDs but no secrets, tokens,
       raw document bodies, or unnecessary PII.
 - [ ] Define API and worker task commands from the same image.
+
+The concrete scanner and RDS delivery boundaries are frozen in the
+[Week 5 AWS application handoff contract](./aws-application-handoff-contract.md).
+The selected scanner is a loopback-only ClamAV sidecar in the worker Fargate
+task; the public regional RDS CA bundle is delivered in the immutable
+application image. These are contract decisions, not claims that live resources
+already exist.
 - [ ] Define a one-off migration task using the same release image.
 - [ ] Add graceful worker shutdown and task visibility/retry evidence.
 
