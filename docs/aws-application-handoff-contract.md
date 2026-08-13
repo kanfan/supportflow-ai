@@ -30,8 +30,21 @@ DocumentSafetyScanner.scan(stream) -> clean | infected | unavailable
 
 The TCP protocol has no authentication or encryption. Loopback-only binding
 and same-task isolation are therefore mandatory, not optional hardening. The
-worker depends on the scanner container reaching `HEALTHY`; the ECS health
-check sends a framed `PING` and requires `PONG`.
+worker depends on the scanner container reaching `HEALTHY`; the health check
+requires both a successful framed `PING`/`PONG` exchange and the loaded
+signature-database freshness check defined below.
+
+An ECS task role is available to every container in a task. The sidecar is not
+given SupportFlow secrets as environment variables, mounted secret files, or
+Secrets Manager injections, but it can reach the worker task-role credential
+endpoint. This shared task-role exposure is an explicitly accepted risk of the
+same-task sidecar design. The worker task role must therefore remain limited to
+the exact tenant-document S3 prefix and required KMS operations, with no broad
+bucket, Secrets Manager, control-plane, or unrelated-service permissions. The
+scanner image is pinned by digest and contains no AWS SDK/configuration. If a
+future threat model requires zero application-IAM exposure to scanner code,
+ClamAV must move to a separate ECS task/service with no task role; that is not
+claimed by this contract.
 
 ### Runtime limits and result mapping
 
@@ -41,9 +54,38 @@ check sends a framed `PING` and requires `PONG`.
 | Stream chunk | 64 KiB |
 | Connect timeout | 2 seconds |
 | Complete scan timeout | 60 seconds |
-| Scanner concurrency | 2 ClamD threads; one in-flight scan per worker child |
+| Ingestion task soft time limit | 120 seconds |
+| Ingestion task hard time limit | 135 seconds |
+| Redis visibility timeout | 180 seconds |
+| Celery staging concurrency | One child per worker task (`--concurrency=1`) |
+| ClamD concurrency | `MaxThreads=2` as daemon/health-check headroom |
 | Client retries | Existing bounded Celery retry policy; no retry inside one scan |
 | Signature freshness gate | Definitions no older than 24 hours |
+
+The required deadline ordering is `scan < soft < hard < visibility`
+(`60 < 120 < 135 < 180` seconds). The scan timeout covers only the ClamD
+exchange; the remaining soft-limit budget covers the S3 read/digest work,
+extraction, database/audit persistence, and retry cleanup. The hard limit is a
+final process-termination guard, and Redis visibility remains longer so an
+interrupted delivery cannot be published again while the original child may
+still be running. Staging task definitions set all four values explicitly and
+contract tests reject an invalid ordering.
+
+The corresponding task-definition inputs are
+`SUPPORTFLOW_DOCUMENT_SCANNER_SCAN_TIMEOUT_SECONDS=60`,
+`SUPPORTFLOW_DOCUMENT_INGESTION_SOFT_TIME_LIMIT_SECONDS=120`,
+`SUPPORTFLOW_DOCUMENT_INGESTION_HARD_TIME_LIMIT_SECONDS=135`, and
+`SUPPORTFLOW_CELERY_VISIBILITY_TIMEOUT_SECONDS=180`. The scanner timeout input
+is implemented with the concrete adapter in Issue #38; the other three use the
+existing validated settings.
+
+The staging Celery command includes `--concurrency=1`; it must not rely on
+auto-detected CPU concurrency. This gives each worker task at most one
+in-flight document scan. Additional throughput comes from increasing the ECS
+worker service task count, not from adding Celery children inside a
+scanner-inclusive task. `MaxThreads=2` leaves one ClamD thread available for
+the health probe and daemon housekeeping; it does not authorize two concurrent
+document scans from one task.
 
 The adapter maps only allowlisted protocol outcomes:
 
@@ -59,9 +101,22 @@ responses, audit metadata, Celery results, or logs. Logs use only the existing
 stable scanner error category and safe document/version identifiers.
 
 The mirrored scanner image starts with official definitions and uses
-`freshclam` through the private-subnet NAT path. A failed freshness gate makes
-the sidecar unhealthy. The scanner receives no AWS application task role and
-no SupportFlow secrets.
+`freshclam` through the private-subnet NAT path. Freshness is measured from the
+database timestamp returned by ClamD's `VERSION` command, because that reports
+the definitions loaded by the running daemon rather than merely a file that
+was downloaded. The health helper performs `PING`, requires `PONG`, then sends
+`VERSION` and parses its database timestamp as UTC.
+
+The probe fails closed when the timestamp is absent or malformed, is older than
+24 hours, or is more than five minutes in the future relative to the
+container's UTC system clock. A timestamp up to five minutes in the future is
+accepted as zero age to tolerate bounded clock skew. ECS/Fargate containers
+share the host clock; persistent skew is treated as platform failure rather
+than bypassing freshness. The essential sidecar is healthy only when both
+responsiveness and signature age pass, so the dependent worker cannot start or
+remain ready with stale loaded definitions. The scanner receives no injected
+SupportFlow secrets; its task-role exposure is governed by the accepted risk
+and least-privilege boundary above.
 
 ### Scanner cost boundary
 
@@ -120,6 +175,8 @@ The platform handoff publishes only sanitized values:
 - API/worker/migration task role ARNs and exact least-privilege boundaries;
 - ECR repository URLs for SupportFlow and the mirrored scanner, plus the
   approved scanner digest;
+- the exact worker command with `--concurrency=1`, the 60/120/135/180-second
+  deadline settings, and the ClamD `MaxThreads=2` configuration;
 - ECS cluster/service/task-family names, ALB target/readiness contract, log
   groups, alarms, budget evidence, and Terraform state location;
 - deploy, rollback, restore, cost-response, and destroy commands.

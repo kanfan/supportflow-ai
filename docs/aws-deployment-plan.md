@@ -139,7 +139,9 @@ Complete before the AWS alpha:
       Celery application configuration; live ElastiCache evidence remains #40.
 - [ ] Confirm structured logs contain correlation IDs but no secrets, tokens,
       raw document bodies, or unnecessary PII.
-- [ ] Define API and worker task commands from the same image.
+- [ ] Define API and worker task commands from the same image; the staging
+      worker command must include `--concurrency=1`, with horizontal capacity
+      controlled by ECS worker task count.
 
 The concrete scanner and RDS delivery boundaries are frozen in the
 [Week 5 AWS application handoff contract](./aws-application-handoff-contract.md).
@@ -200,6 +202,13 @@ Object recovery:
 - [ ] RDS and ElastiCache have no public route.
 - [ ] S3 Block Public Access is enabled.
 - [ ] Task roles cannot access unrelated buckets/secrets.
+- [ ] The ClamAV sidecar receives no injected SupportFlow secrets; its accepted
+      access to same-task IAM credentials is recorded and the shared worker
+      task role is proven least-privilege.
+- [ ] Scanner/task deadlines prove the required order: 60-second scan,
+      120-second soft limit, 135-second hard limit, then 180-second visibility;
+      the essential sidecar health probe proves both ClamD responsiveness and
+      loaded-signature freshness.
 - [ ] CloudTrail captures deployment/control-plane activity.
 - [ ] Cost dashboard and budget alerts are reviewed.
 - [ ] Sanitized acceptance evidence is saved before Terraform teardown.

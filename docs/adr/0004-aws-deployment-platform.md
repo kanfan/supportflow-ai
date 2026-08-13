@@ -101,6 +101,11 @@ are outside this decision.
   named secrets.
 - The application task role receives only the required S3 and service actions.
   It does not receive broad administrator permissions.
+- Every container in one ECS task can reach that task's role credentials. The
+  ClamAV sidecar therefore shares the worker task-role exposure even though no
+  SupportFlow secret is injected into it. The portfolio deployment accepts
+  this risk with a digest-pinned scanner and a narrowly scoped worker task
+  role; a zero-IAM scanner boundary would require a separate ECS task/service.
 - RDS and ElastiCache are never public.
 
 ### Secrets and configuration
