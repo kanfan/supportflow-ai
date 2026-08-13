@@ -215,6 +215,32 @@ def test_deployed_visibility_timeout_must_exceed_worker_hard_limit() -> None:
         )
 
 
+def test_default_scanner_and_worker_deadlines_follow_accepted_contract() -> None:
+    settings = Settings(environment="test")
+
+    assert settings.document_scanner_scan_timeout_seconds == 60
+    assert settings.document_ingestion_soft_time_limit_seconds == 120
+    assert settings.document_ingestion_hard_time_limit_seconds == 135
+    assert settings.celery_visibility_timeout_seconds == 180
+
+
+def test_scanner_timeout_must_be_shorter_than_worker_soft_limit() -> None:
+    with pytest.raises(ValidationError, match="scanner timeout"):
+        Settings(
+            environment="test",
+            document_scanner_scan_timeout_seconds=120,
+            document_ingestion_soft_time_limit_seconds=120,
+        )
+
+
+def test_deployed_clamd_scanner_is_restricted_to_loopback() -> None:
+    with pytest.raises(ValidationError, match="CLAMD_HOST"):
+        deployed_settings(
+            document_scanner_mode="clamd",
+            document_clamd_host="scanner.internal",
+        )
+
+
 def test_deployed_environment_rejects_local_document_storage() -> None:
     with pytest.raises(ValidationError, match="DOCUMENT_STORAGE_MODE"):
         Settings(

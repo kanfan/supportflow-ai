@@ -9,7 +9,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.documents.ports import DocumentStorage
+from app.documents.ports import DocumentSafetyScanner, DocumentStorage
 from app.documents.s3_storage import S3Client, S3DocumentStorage
 from app.documents.worker_runtime import DocumentWorkerRuntime
 from app.worker import create_celery
@@ -66,6 +66,29 @@ def test_creating_celery_in_parent_does_not_create_worker_storage(
 
     monkeypatch.setattr(
         "app.documents.worker_runtime.resolve_document_storage",
+        fail_if_resolved,
+    )
+
+    create_celery(s3_settings())
+
+    assert resolver_calls == 0
+
+
+def test_creating_celery_in_parent_does_not_create_worker_scanner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resolver_calls = 0
+
+    def fail_if_resolved(
+        _settings: Settings,
+        _configured_scanner: DocumentSafetyScanner | None,
+    ) -> DocumentSafetyScanner:
+        nonlocal resolver_calls
+        resolver_calls += 1
+        raise AssertionError("parent process must not create worker scanner")
+
+    monkeypatch.setattr(
+        "app.documents.worker_runtime.resolve_document_safety_scanner",
         fail_if_resolved,
     )
 

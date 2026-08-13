@@ -1,4 +1,5 @@
 from app.config import Settings
+from app.documents.clamd import ClamdDocumentSafetyScanner
 from app.documents.ports import (
     DocumentSafetyScanner,
     DocumentStorage,
@@ -64,6 +65,27 @@ def resolve_document_safety_scanner(
         return FakeDocumentSafetyScanner(
             gate_path=settings.document_fake_scanner_gate_path,
             gate_timeout_seconds=(settings.document_fake_scanner_gate_timeout_seconds),
+        )
+
+    if settings.document_scanner_mode == "clamd":
+        if configured_scanner is not None:
+            if not isinstance(configured_scanner, ClamdDocumentSafetyScanner):
+                raise DocumentScannerConfigurationError(
+                    "ClamD scanner mode requires the concrete ClamD adapter"
+                )
+            return configured_scanner
+        return ClamdDocumentSafetyScanner(
+            host=settings.document_clamd_host,
+            port=settings.document_clamd_port,
+            connect_timeout_seconds=(settings.document_scanner_connect_timeout_seconds),
+            scan_timeout_seconds=settings.document_scanner_scan_timeout_seconds,
+            max_stream_bytes=settings.document_max_upload_bytes,
+            signature_max_age_seconds=(
+                settings.document_scanner_signature_max_age_seconds
+            ),
+            clock_skew_tolerance_seconds=(
+                settings.document_scanner_clock_skew_tolerance_seconds
+            ),
         )
 
     if configured_scanner is None:
