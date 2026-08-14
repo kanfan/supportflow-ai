@@ -8,7 +8,7 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > organization context, admin/agent membership controls, tenant-scoped ticket
 > workflows, append-only audit events, the authenticated agent workspace, secure
 > document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
-> automated suite contains 202 tests and passes with PostgreSQL and Redis integration
+> automated suite contains 250 tests and passes with PostgreSQL and Redis integration
 > enabled. Week 5 AWS staging delivery is now in progress; no AWS staging
 > deployment is claimed yet. AI classification and RAG remain follow-up
 > milestones.
@@ -76,6 +76,14 @@ Runtime and development dependencies are declared in `pyproject.toml` and resolv
 
 ### AWS deployment target
 
+The AWS environment exists to produce verifiable portfolio evidence, not to
+operate a startup or serve real customers. It has no uptime or commercial
+availability objective and accepts synthetic data only. A deployment is claimed
+only after Terraform apply, GitHub OIDC release, migration, smoke, rollback,
+recovery, security, observability, and cost evidence have been recorded. The
+environment is then destroyed; it is recreated only for a planned verification
+or portfolio-demonstration window.
+
 The API and Celery worker will use the same immutable image from Amazon ECR and
 run as separate ECS/Fargate services. Only the Application Load Balancer is
 public. ECS tasks have no public IP and use private application subnets with an
@@ -136,7 +144,8 @@ accepted ownership and handoff contract in
 - [ ] #38 supplies the S3/scanner/session/readiness application adapters.
 - [ ] #39 deploys one immutable image digest through scoped GitHub OIDC.
 - [ ] #40 records integrated staging, rollback, recovery, security, cost, and teardown evidence.
-- [ ] Product validation starts only after the technical staging alpha is accepted.
+- [ ] Sanitized deployment evidence is retained and disposable AWS resources
+      are destroyed within 24 hours after the planned verification window.
 
 ## Week 5 ownership and handoff
 
@@ -533,6 +542,7 @@ The complete AWS-aligned project plan (revision 1.2) is available in
 - [ADR 0005: Document ingestion and worker reliability contracts](./docs/adr/0005-document-ingestion-and-worker-reliability.md)
 - [ADR 0006: Week 5 AWS delivery ownership and handoff](./docs/adr/0006-week-5-aws-delivery-and-handoff.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
+- [Week 5 AWS application handoff contract](./docs/aws-application-handoff-contract.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 - [Week 3 threat model](./docs/security/week-3-threat-model.md)
 - [Week 3 release verification](./docs/reviews/week-3-verification.md)

@@ -3,6 +3,34 @@
 This document turns ADR 0004 into a staged engineering plan. It defines the
 order and evidence; it does not claim that AWS infrastructure already exists.
 
+## Portfolio purpose and operating model
+
+SupportFlow is a portfolio and engineering-learning project. It is not being
+operated as a startup, has no real-customer acquisition target, and does not
+need an always-on public environment or availability SLA. AWS is selected so
+the team can implement, run, and explain a real production-shaped deployment;
+it is not selected to imply commercial production traffic.
+
+The AWS environments are therefore ephemeral evidence environments:
+
+1. provision the reviewed topology for a scheduled verification window;
+2. deploy through GitHub OIDC and the immutable-image pipeline;
+3. run migration, end-to-end, scanner, rollback, restore, security,
+   observability, and cost checks with synthetic data;
+4. save sanitized, reproducible evidence in GitHub; and
+5. run the reviewed Terraform destroy procedure within 24 hours after the
+   verification window completes.
+
+The environment may be recreated for the Week 9 beta, Week 11 release-candidate
+rehearsal, or Week 12 portfolio demonstration. Between those windows, no
+persistent ECS, ALB, NAT, RDS, or ElastiCache runtime is required. Promotional
+credits or Free Tier eligibility reduce out-of-pocket cost but never replace
+budgets, Cost Explorer checks, tags, or teardown evidence.
+
+The phrase "deployed on AWS" is used only after the live acceptance evidence
+exists. Until then, repository language must say "AWS deployment target" or
+"deployment in progress."
+
 ## Target topology
 
 ```text
@@ -64,6 +92,11 @@ the complete handoff.
 - [ ] Configure project/environment/owner/cost tags.
 - [ ] Create the USD 120 monthly AWS Budget with the actual and forecast alerts
       and response policy defined below.
+- [ ] Add early portfolio-run notifications at USD 10, USD 25, and USD 50
+      actual/forecast spend; USD 50 is the operational stop-and-review point,
+      while USD 120 remains the emergency monthly ceiling.
+- [ ] Record Free Tier/promotional-credit eligibility and expiry without
+      treating credits as a spending control.
 - [ ] Decide staging and production-demo DNS names.
 - [ ] Record the synthetic-data-only boundary.
 - [ ] Confirm that no real-data/KVKK claim is implied by the deployment.
@@ -106,7 +139,16 @@ Complete before the AWS alpha:
       Celery application configuration; live ElastiCache evidence remains #40.
 - [ ] Confirm structured logs contain correlation IDs but no secrets, tokens,
       raw document bodies, or unnecessary PII.
-- [ ] Define API and worker task commands from the same image.
+- [ ] Define API and worker task commands from the same image; the staging
+      worker command must include `--concurrency=1`, with horizontal capacity
+      controlled by ECS worker task count.
+
+The concrete scanner and RDS delivery boundaries are frozen in the
+[Week 5 AWS application handoff contract](./aws-application-handoff-contract.md).
+The selected scanner is a loopback-only ClamAV sidecar in the worker Fargate
+task; the public regional RDS CA bundle is delivered in the immutable
+application image. These are contract decisions, not claims that live resources
+already exist.
 - [ ] Define a one-off migration task using the same release image.
 - [ ] Add graceful worker shutdown and task visibility/retry evidence.
 
@@ -160,8 +202,18 @@ Object recovery:
 - [ ] RDS and ElastiCache have no public route.
 - [ ] S3 Block Public Access is enabled.
 - [ ] Task roles cannot access unrelated buckets/secrets.
+- [ ] The ClamAV sidecar receives no injected SupportFlow secrets; its accepted
+      access to same-task IAM credentials is recorded and the shared worker
+      task role is proven least-privilege.
+- [ ] Scanner/task deadlines prove the required order: 60-second scan,
+      120-second soft limit, 135-second hard limit, then 180-second visibility;
+      the essential sidecar health probe proves both ClamD responsiveness and
+      loaded-signature freshness.
 - [ ] CloudTrail captures deployment/control-plane activity.
 - [ ] Cost dashboard and budget alerts are reviewed.
+- [ ] Sanitized acceptance evidence is saved before Terraform teardown.
+- [ ] Disposable staging resources are destroyed within 24 hours after the
+      planned verification window.
 
 ## Week mapping
 
@@ -229,6 +281,10 @@ AWS resources are not free merely because traffic is low. Persistent ALB, NAT,
 RDS, and ElastiCache resources can dominate idle cost. The team must:
 
 - create a USD 120 monthly cost budget before staging;
+- configure additional USD 10, USD 25, and USD 50 actual/forecast notifications
+  for the short portfolio deployment window;
+- treat USD 50 as the operational stop-and-review threshold even when
+  promotional credit remains, while USD 120 stays the emergency monthly cap;
 - notify both Emir and Eray through verified email/SNS subscriptions at 50%,
   80%, and 100% of actual spend, and at 80% and 100% of forecast spend;
 - treat 50% as informational; at 80% actual or forecast, freeze new paid
@@ -243,6 +299,9 @@ RDS, and ElastiCache resources can dominate idle cost. The team must:
 - never keep staging and production-demo persistent simultaneously without a
   documented milestone exception, and destroy an idle disposable environment
   within 48 hours;
+- destroy the active disposable environment within 24 hours after its planned
+  acceptance/evidence window completes; the 48-hour rule remains only the
+  backstop for an environment that becomes unexpectedly idle;
 - retain CloudWatch logs for 14 days in staging and 30 days in production-demo,
   keep only the current and immediately previous ECR release images, expire
   noncurrent S3 object versions after 30 days, and delete temporary database

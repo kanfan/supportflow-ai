@@ -20,6 +20,12 @@ The portfolio release uses synthetic or explicitly approved data. Choosing AWS
 does not by itself satisfy KVKK, data-transfer, retention, or production
 readiness requirements.
 
+The project is not a startup deployment and has no real-customer or always-on
+service objective. The purpose of AWS is to create reproducible engineering
+and portfolio evidence for infrastructure, delivery, security, recovery,
+observability, and cost controls. Commercial validation and customer operation
+are outside this decision.
+
 ## Decision
 
 ### Region and environments
@@ -95,6 +101,11 @@ readiness requirements.
   named secrets.
 - The application task role receives only the required S3 and service actions.
   It does not receive broad administrator permissions.
+- Every container in one ECS task can reach that task's role credentials. The
+  ClamAV sidecar therefore shares the worker task-role exposure even though no
+  SupportFlow secret is injected into it. The portfolio deployment accepts
+  this risk with a digest-pinned scanner and a narrowly scoped worker task
+  role; a zero-IAM scanner boundary would require a separate ECS task/service.
 - RDS and ElastiCache are never public.
 
 ### Secrets and configuration
@@ -154,12 +165,21 @@ normal production rollback mechanism.
   deployments stop and disposable staging is destroyed within 24 hours unless
   both owners record a time-bounded exception.
 - Budget data can be delayed and AWS Budgets is not a hard spending cap.
+- Short portfolio deployment windows add USD 10, USD 25, and USD 50
+  actual/forecast notifications. USD 50 is the operational stop-and-review
+  point even when promotional credit remains; USD 120 remains the emergency
+  monthly ceiling.
 - Staging and production-demo are not persistent simultaneously without a
   milestone exception. Idle disposable environments are destroyed within 48
   hours. Logs are retained for 14 days in staging and 30 days in
   production-demo; only the current and previous ECR releases are retained;
   noncurrent S3 versions expire after 30 days; temporary restore-test snapshots
   expire within 7 days.
+- A planned evidence environment is destroyed within 24 hours after its
+  verification window completes. Sanitized plans, release identifiers, test
+  results, screenshots/metrics, rollback/restore results, cost evidence, and
+  destroy evidence are retained; paid runtime resources are not kept merely to
+  preserve the phrase "deployed on AWS."
 
 ### Infrastructure as code
 
@@ -227,6 +247,7 @@ The first infrastructure modules cover:
 - Splitting the modular monolith into microservices
 - Multi-region active-active deployment
 - Commercial production readiness or a KVKK compliance claim
+- Startup operation, customer acquisition, or a continuously available demo
 - Automatic database downgrade during rollback
 - Autoscaling before a measured baseline exists
 - Public RDS, public ElastiCache, or public S3 objects
