@@ -1,7 +1,9 @@
-"""Create the ephemeral AWS portfolio-evidence revision of the project-plan PDF.
+"""Create Revision 1.3 from the 29-page AWS Revision 1.2 project plan.
 
-The script deliberately edits only the deployment-specific areas of revision
-1.1. It must not replace unrelated language such as "server-rendered UI".
+The source contract is intentionally strict because every redaction coordinate
+is tied to Revision 1.2's 29-page layout. Recover the expected source from Git
+commit ``4b869d2`` as documented in the README. The script must not replace
+unrelated language such as "server-rendered UI".
 
 Usage:
     uv run --with PyMuPDF python scripts/revise_project_plan_for_aws.py \
@@ -28,6 +30,11 @@ from reportlab.platypus import Paragraph
 
 PAGE_WIDTH = 612
 PAGE_HEIGHT = 792
+EXPECTED_SOURCE_COMMIT = "4b869d2"
+EXPECTED_SOURCE_PAGE_COUNT = 29
+EXPECTED_SOURCE_REVISION = "1.2"
+EXPECTED_SOURCE_TITLE = "SupportFlow AI - Uçtan Uca Proje Planı (AWS Revision 1.2)"
+EXPECTED_SOURCE_REVISION_MARKER = "Rapor sürümü: 1.2"
 BLUE = colors.HexColor("#1F4E79")
 ACCENT_BLUE = colors.HexColor("#2E75B6")
 LIGHT_BLUE = colors.HexColor("#EAF2F8")
@@ -419,7 +426,7 @@ def draw_page_14(target: canvas.Canvas) -> None:
             "Yalnız ALB public; ECS private, RDS/ElastiCache izole ve S3 private çalışır.",
             "ClamAV sidecar, TLS, readiness, tenant sınırları ve secret redaction doğrulanır.",
             "Rollback, RDS restore, S3 recovery, alarm ve cost-response prosedürü prova edilir.",
-            "Sanitize kanıt/video alınır; disposable kaynaklar 24 saat içinde destroy edilir.",
+            "Arındırılmış kanıt/video alınır; disposable kaynaklar 24 saat içinde destroy edilir.",
         ],
         size=8.8,
         leading=10.5,
@@ -497,7 +504,7 @@ def draw_page_17(target: canvas.Canvas) -> None:
         54,
         704,
         504,
-        "•&nbsp;&nbsp;Kalıcı servis yerine sanitize v1.0 AWS kanıt paketi yayımlanır.",
+        "•&nbsp;&nbsp;Kalıcı servis yerine arındırılmış v1.0 AWS kanıt paketi yayımlanır.",
         size=9.5,
         leading=11,
     )
@@ -600,7 +607,7 @@ def draw_page_20(target: canvas.Canvas) -> None:
         "Login, ticket, document, worker ve AI smoke akışları çalıştırılır.",
         "Uygulama hatasında önceki ECS revision’a dönülür; migration için forward-fix esastır.",
         "Veri olayı varsa doğrulanmış RDS point-in-time restore prosedürü kullanılır.",
-        "Sanitize kanıt alınır; disposable AWS kaynakları 24 saat içinde destroy ve verify edilir.",
+        "Arındırılmış kanıt alınır; disposable AWS kaynakları 24 saat içinde destroy ve verify edilir.",
     ]
     for number, step in enumerate(steps, start=1):
         height = paragraph_top(
@@ -635,7 +642,7 @@ def draw_page_21(target: canvas.Canvas) -> None:
         ),
         ("v0.5 Beta", "9", "AI/RAG beta; gerekirse yeni kısa AWS evidence window"),
         ("v0.9 RC", "11", "Hardening ve release kanıt provası; kalıcı servis yok"),
-        ("v1.0", "12", "Sanitize evidence, README, video ve portföy paketi"),
+        ("v1.0", "12", "Arındırılmış kanıt, README, video ve portföy paketi"),
     ]
     columns = [54, 150, 198, 558]
     positions = [69, 84, 105, 126, 147, 168]
@@ -684,7 +691,7 @@ def draw_page_23(target: canvas.Canvas) -> None:
         [
             "Problem, hedef niş ve ürün değeri",
             "Pazar örnekleri ve SupportFlow’un farklılaşması",
-            "Sanitize AWS kanıtı, demo videosu ve local yeniden üretim adımları",
+            "Arındırılmış AWS kanıtı, demo videosu ve local yeniden üretim adımları",
             "Mimari diagram ve request flow",
             "Stack ve nedenleri",
             "Local setup ve environment variables",
@@ -723,7 +730,7 @@ def draw_page_24(target: canvas.Canvas) -> None:
         target,
         66,
         340,
-        "Kalıcı demo hesabı yerine sanitize AWS kanıtı ve local demo adımları doğrulandı.",
+        "Kalıcı demo hesabı yerine arındırılmış AWS kanıtı ve local demo adımları doğrulandı.",
         size=8.8,
     )
 
@@ -895,17 +902,68 @@ def redact_original_content(source: Path) -> BytesIO:
     return result
 
 
+def validate_source_pdf(source: Path) -> PdfReader:
+    """Validate the immutable layout contract before using page coordinates."""
+
+    if not source.is_file():
+        raise ValueError(
+            f"Unsupported source PDF: {source} is not a readable file. "
+            f"Expected the {EXPECTED_SOURCE_PAGE_COUNT}-page AWS Revision "
+            f"{EXPECTED_SOURCE_REVISION} PDF from commit {EXPECTED_SOURCE_COMMIT}."
+        )
+
+    try:
+        reader = PdfReader(source)
+        page_count = len(reader.pages)
+        title = reader.metadata.title if reader.metadata is not None else None
+        first_page_text = reader.pages[0].extract_text() if page_count else ""
+    except Exception as exc:
+        raise ValueError(
+            f"Unsupported source PDF: {source} could not be read. Expected the "
+            f"{EXPECTED_SOURCE_PAGE_COUNT}-page AWS Revision "
+            f"{EXPECTED_SOURCE_REVISION} PDF from commit {EXPECTED_SOURCE_COMMIT}."
+        ) from exc
+
+    mismatches: list[str] = []
+    if page_count != EXPECTED_SOURCE_PAGE_COUNT:
+        mismatches.append(
+            f"page count {page_count!r} (expected {EXPECTED_SOURCE_PAGE_COUNT})"
+        )
+    if title != EXPECTED_SOURCE_TITLE:
+        mismatches.append(f"title {title!r} (expected {EXPECTED_SOURCE_TITLE!r})")
+    if EXPECTED_SOURCE_REVISION_MARKER not in (first_page_text or ""):
+        mismatches.append(
+            "first-page revision marker missing "
+            f"(expected {EXPECTED_SOURCE_REVISION_MARKER!r})"
+        )
+
+    if mismatches:
+        details = "; ".join(mismatches)
+        raise ValueError(
+            f"Unsupported source PDF: {details}. Recover the exact Revision "
+            f"{EXPECTED_SOURCE_REVISION} source from Git commit "
+            f"{EXPECTED_SOURCE_COMMIT} using the README instructions before "
+            "running this generator."
+        )
+
+    return reader
+
+
 def revise_pdf(source: Path, output: Path) -> None:
     if source.resolve() == output.resolve():
         raise ValueError(
             "Source and output must differ so the original can be reviewed."
         )
 
+    validate_source_pdf(source)
     register_fonts()
     redacted_source = redact_original_content(source)
     reader = PdfReader(redacted_source)
-    if len(reader.pages) != 29:
-        raise ValueError(f"Expected 29 pages, found {len(reader.pages)}.")
+    if len(reader.pages) != EXPECTED_SOURCE_PAGE_COUNT:
+        raise RuntimeError(
+            "PDF redaction unexpectedly changed the source page count: "
+            f"expected {EXPECTED_SOURCE_PAGE_COUNT}, found {len(reader.pages)}."
+        )
 
     writer = PdfWriter()
     for page_number, page in enumerate(reader.pages, start=1):
@@ -938,9 +996,23 @@ def revise_pdf(source: Path, output: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("source", type=Path)
-    parser.add_argument("output", type=Path)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate Revision 1.3 from the 29-page AWS Revision 1.2 PDF "
+            f"stored at Git commit {EXPECTED_SOURCE_COMMIT}."
+        ),
+        epilog=(
+            "The source must have the expected page count, metadata title, and "
+            "first-page Revision 1.2 marker. See README.md for the binary-safe "
+            "source recovery command."
+        ),
+    )
+    parser.add_argument(
+        "source",
+        type=Path,
+        help="29-page AWS Revision 1.2 source recovered from commit 4b869d2",
+    )
+    parser.add_argument("output", type=Path, help="Revision 1.3 output path")
     return parser.parse_args()
 
 

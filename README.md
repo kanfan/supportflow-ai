@@ -534,6 +534,30 @@ Install the Git hook once with `uv run pre-commit install`. GitHub Actions repea
 The complete AWS-aligned project plan (revision 1.3) is available in
 [SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf](./SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf).
 
+### Regenerating the project-plan PDF
+
+The generator is layout-specific: it accepts only the 29-page AWS Revision 1.2
+PDF stored at commit `4b869d2`, then produces Revision 1.3. It intentionally
+rejects the original 23-page Revision 1.1 PDF before applying any page-indexed
+redactions.
+
+Recover the binary source safely from Git in PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force tmp/pdfs | Out-Null
+uv run python -c "from pathlib import Path; import subprocess; Path(r'tmp/pdfs/project-plan-revision-1.2.pdf').write_bytes(subprocess.check_output(['git', 'show', '4b869d2:SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf']))"
+```
+
+Generate Revision 1.3 without overwriting the recovered source:
+
+```powershell
+uv run --with PyMuPDF python scripts/revise_project_plan_for_aws.py tmp/pdfs/project-plan-revision-1.2.pdf SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf
+```
+
+The script validates the source page count, metadata title, and first-page
+revision marker before redaction. A mismatch raises a `ValueError` that names
+the expected revision and recovery commit.
+
 - [API conventions](./docs/api-conventions.md)
 - [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
 - [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)
