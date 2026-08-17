@@ -1,7 +1,9 @@
-"""Create the AWS-aligned revision of the SupportFlow project-plan PDF.
+"""Create Revision 1.3 from the 29-page AWS Revision 1.2 project plan.
 
-The script deliberately edits only the deployment-specific areas of revision
-1.1. It must not replace unrelated language such as "server-rendered UI".
+The source contract is intentionally strict because every redaction coordinate
+is tied to Revision 1.2's 29-page layout. Recover the expected source from Git
+commit ``4b869d2`` as documented in the README. The script must not replace
+unrelated language such as "server-rendered UI".
 
 Usage:
     uv run --with PyMuPDF python scripts/revise_project_plan_for_aws.py \
@@ -13,6 +15,7 @@ from __future__ import annotations
 import argparse
 from io import BytesIO
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any
 
 from pypdf import PdfReader, PdfWriter
@@ -27,11 +30,17 @@ from reportlab.platypus import Paragraph
 
 PAGE_WIDTH = 612
 PAGE_HEIGHT = 792
+EXPECTED_SOURCE_COMMIT = "4b869d2"
+EXPECTED_SOURCE_PAGE_COUNT = 29
+EXPECTED_SOURCE_REVISION = "1.2"
+EXPECTED_SOURCE_TITLE = "SupportFlow AI - Uçtan Uca Proje Planı (AWS Revision 1.2)"
+EXPECTED_SOURCE_REVISION_MARKER = "Rapor sürümü: 1.2"
 BLUE = colors.HexColor("#1F4E79")
 ACCENT_BLUE = colors.HexColor("#2E75B6")
 LIGHT_BLUE = colors.HexColor("#EAF2F8")
 LIGHT_GREEN = colors.HexColor("#E2F0D9")
 LIGHT_GRAY = colors.HexColor("#F2F4F7")
+LIGHT_YELLOW = colors.HexColor("#FFF2CC")
 BLACK = colors.black
 WHITE = colors.white
 
@@ -112,7 +121,7 @@ def paragraph_top(
     size: float = 10.5,
     leading: float = 12.5,
     color: colors.Color = BLACK,
-    alignment: int = TA_LEFT,
+    alignment: Any = TA_LEFT,
 ) -> float:
     style = ParagraphStyle(
         name="overlay",
@@ -158,8 +167,8 @@ def bullet_lines(
 
 def draw_grid(
     target: canvas.Canvas,
-    x_positions: list[float],
-    top_positions: list[float],
+    x_positions: Sequence[float],
+    top_positions: Sequence[float],
 ) -> None:
     target.setStrokeColor(BLACK)
     target.setLineWidth(0.5)
@@ -178,35 +187,35 @@ def draw_page_1(target: canvas.Canvas) -> None:
     centered_text_top(
         target,
         344,
-        "Yayın hedefi: AWS üzerinde canlı, testli ve ölçümlü ürün v1.0",
-        size=10.5,
+        "Yayın hedefi: AWS'te kısa ömürlü, production-shaped portföy kanıtı",
+        size=10.1,
     )
     centered_text_top(
         target,
         359,
-        "Rapor sürümü: 1.2 - AWS altyapısı, yayın ve geri dönüş revizyonu",
-        size=10.5,
+        "Rapor sürümü: 1.3 - AWS portföy kanıtı ve 24 saat teardown revizyonu",
+        size=9.8,
     )
 
     whiteout(target, 52, 427, 508, 42)
     centered_text_top(
         target,
         429,
-        "Hazırlanma amacı: Fikirden canlı yayına, teknik sunuma, Türkiye pazarı",
+        "Hazırlanma amacı: Fikirden tekrar üretilebilir ürüne, teknik sunuma ve",
         font="Arial-Italic",
         size=9.7,
     )
     centered_text_top(
         target,
         443,
-        "doğrulamasına ve portföye kadar çalışma düzenini tanımlamak.",
+        "sentetik verili AWS portföy kanıtına kadar çalışma düzenini tanımlamak.",
         font="Arial-Italic",
         size=9.7,
     )
     centered_text_top(
         target,
         457,
-        "Son revizyon: 27 Temmuz 2026.",
+        "Son revizyon: 13 Ağustos 2026.",
         font="Arial-Italic",
         size=9.7,
     )
@@ -255,12 +264,28 @@ def draw_page_3(target: canvas.Canvas) -> None:
         (
             "<b>Tek cümlelik hedef:</b> 12. haftanın sonunda kullanıcı girişi olan, "
             "tenant izolasyonu sağlayan, doküman yükleyen, ticket oluşturan, RAG ile "
-            "kaynaklı cevap öneren, insan onayı toplayan, test edilen ve AWS üzerinde "
-            "çalışan bir ürün v1.0 yayınlamak; ticari pilot kararını müşteri görüşmeleri "
-            "ve KVKK yayın kapısı sonrasında vermek."
+            "kaynaklı cevap öneren, insan onayı toplayan ve test edilen ürün v1.0’ı "
+            "planlı, kısa ömürlü bir AWS kanıt penceresinde doğrulamak; kanıtları "
+            "saklayıp kaynakları 24 saat içinde destroy etmek."
         ),
         size=9.2,
         leading=11.0,
+    )
+
+    fill_top(target, 54, 410, 504, 49, LIGHT_YELLOW)
+    paragraph_top(
+        target,
+        59.5,
+        414,
+        493,
+        (
+            "<b>İki ayrı hazır olma seviyesi:</b> Portföy-ready: sentetik veriyle "
+            "tekrar üretilebilir AWS apply/deploy/verify/destroy kanıtı. Pilot-ready: "
+            "doğrulanmış hedef müşteri, gerçek kanal ve veri işleme/aktarım kapıları; "
+            "bu karar AWS ortamını sürekli açık tutmaz."
+        ),
+        size=8.8,
+        leading=10.5,
     )
 
 
@@ -348,7 +373,7 @@ def draw_page_14(target: canvas.Canvas) -> None:
         target,
         54,
         174,
-        "Hafta 5 - AWS altyapısı, CI/CD ve Alpha yayın",
+        "Hafta 5 - AWS portföy kanıtı ve uygulama entegrasyonu",
         font="Arial-Bold",
         size=14,
         color=ACCENT_BLUE,
@@ -360,8 +385,8 @@ def draw_page_14(target: canvas.Canvas) -> None:
         198,
         494,
         (
-            "<b>Haftanın amacı:</b> AI olmadan çalışan backend’i AWS staging "
-            "ortamına güvenli ve geri alınabilir biçimde yayınlamak."
+            "<b>Haftanın amacı:</b> Backend’i sentetik veriyle kısa ömürlü, güvenli, "
+            "geri alınabilir ve tekrar üretilebilir bir AWS kanıt penceresinde doğrulamak."
         ),
         size=9.2,
         leading=10.5,
@@ -372,9 +397,9 @@ def draw_page_14(target: canvas.Canvas) -> None:
         target,
         241,
         [
-            "Terraform ile VPC, ECS API/worker, RDS+pgvector, ElastiCache ve S3 temelini kurar.",
-            "Secrets Manager, tek seferlik migration task’ı ve alpha smoke scriptini hazırlar.",
-            "CloudWatch health/log alarmları ile AWS Budgets maliyet sınırını tanımlar.",
+            "S3/scanner/session/readiness ve TLS uygulama sınırlarını geliştirip test eder.",
+            "Terraform planı, IAM, ağ, maliyet, secret ve handoff sözleşmelerini review eder.",
+            "Sentetik teknik kabul matrisini, güvenlik negatiflerini ve kanıt paketini yönetir.",
         ],
         size=8.8,
         leading=10.5,
@@ -385,9 +410,9 @@ def draw_page_14(target: canvas.Canvas) -> None:
         target,
         cursor + 17,
         [
-            "GitHub Actions OIDC, kalite kontrolleri ve ECR commit-SHA image akışını kurar.",
-            "API ve worker’ı aynı image digest ile yayınlayan health-gated workflow’u geliştirir.",
-            "Test fixture/factory, coverage raporu ve fail-fast kurallarını tamamlar.",
+            "AWS account/billing, Terraform state, VPC/IAM/ECS/RDS/Redis/S3 temelini kurar.",
+            "GitHub OIDC ile tek digest migration, API ve worker deployment akışını geliştirir.",
+            "USD 10/25/50 uyarıları, USD 120 emergency ceiling ve teardown runbook’unu işletir.",
         ],
         size=8.8,
         leading=10.5,
@@ -398,10 +423,10 @@ def draw_page_14(target: canvas.Canvas) -> None:
         target,
         cursor + 17,
         [
-            "Yalnız ALB public; ECS, RDS ve ElastiCache private subnetlerde çalışır.",
-            "Sentetik demo organization/user/ticket oluşturulur; TLS ve readiness doğrulanır.",
-            "Önceki ECS revision’a rollback ve RDS restore prosedürü prova edilir.",
-            "Alpha demo videosu ve kısa operasyon runbook’u hazırlanır.",
+            "Yalnız ALB public; ECS private, RDS/ElastiCache izole ve S3 private çalışır.",
+            "ClamAV sidecar, TLS, readiness, tenant sınırları ve secret redaction doğrulanır.",
+            "Rollback, RDS restore, S3 recovery, alarm ve cost-response prosedürü prova edilir.",
+            "Arındırılmış kanıt/video alınır; disposable kaynaklar 24 saat içinde destroy edilir.",
         ],
         size=8.8,
         leading=10.5,
@@ -412,10 +437,10 @@ def draw_page_14(target: canvas.Canvas) -> None:
         target,
         cursor + 17,
         [
-            "Staging login/ticket/document upload ve canlı worker job’ı çalışır.",
-            "Alembic kontrollü one-off task olarak çalışır; readiness gate geçer.",
-            "Rollback provası ve smoke test sonucu kayıt altındadır.",
-            "README’de alpha URL/runbook vardır; uzun ömürlü AWS access key yoktur.",
+            "Login/ticket/upload/worker smoke akışı sentetik veride geçer.",
+            "Alembic one-off task, API ve worker aynı immutable digest’i kullanır.",
+            "OIDC, observability, rollback/restore ve cost kanıtları kayıt altındadır.",
+            "Kalıcı URL/key yoktur; resource inventory boşluğu ve destroy sonucu doğrulanır.",
         ],
         size=8.8,
         leading=10.5,
@@ -427,13 +452,38 @@ def draw_page_14(target: canvas.Canvas) -> None:
         59,
         cursor + 4,
         494,
-        "<b>Haftalık sahiplik:</b> Release Captain: Emir | CI Captain: Eray",
+        "<b>Haftalık sahiplik:</b> Platform/Release Captain: Eray | App Verification Lead: Emir",
         size=8.8,
         leading=10,
     )
 
 
 def draw_page_17(target: canvas.Canvas) -> None:
+    whiteout(target, 54, 395, 504, 16)
+    paragraph_top(
+        target,
+        54,
+        397,
+        504,
+        "•&nbsp;&nbsp;RC, planlı AWS kanıt penceresinde doğrulanır; kanıt sonrası ortam destroy edilir.",
+        size=9.4,
+        leading=11,
+    )
+
+    whiteout(target, 54, 539, 504, 16)
+    paragraph_top(
+        target,
+        59.5,
+        541,
+        494,
+        (
+            "<b>Haftanın amacı:</b> v1.0 kanıt paketi, tekrar üretilebilir demo, "
+            "güçlü README ve mülakat anlatımı."
+        ),
+        size=8.9,
+        leading=10.5,
+    )
+
     whiteout(target, 54, 642, 504, 16)
     paragraph_top(
         target,
@@ -441,11 +491,22 @@ def draw_page_17(target: canvas.Canvas) -> None:
         643,
         504,
         (
-            "•&nbsp;&nbsp;v1.0 tag, release notes, AWS/ECS deploy, migration ve "
-            "rollback kontrolünü yönetir."
+            "•&nbsp;&nbsp;v1.0 tag, OIDC/ECS evidence window, migration, rollback ve "
+            "24 saat teardown kontrolünü yönetir."
         ),
-        size=10.2,
-        leading=12,
+        size=9.3,
+        leading=11,
+    )
+
+    whiteout(target, 54, 702, 504, 16)
+    paragraph_top(
+        target,
+        54,
+        704,
+        504,
+        "•&nbsp;&nbsp;Kalıcı servis yerine arındırılmış v1.0 AWS kanıt paketi yayımlanır.",
+        size=9.5,
+        leading=11,
     )
 
 
@@ -493,15 +554,11 @@ def draw_page_20(target: canvas.Canvas) -> None:
     rows = [
         ("Local", "Geliştirme/debug", "Docker Compose; fake/seed data"),
         (
-            "Staging/Beta",
-            "Entegrasyon ve demo provası",
-            "Ayrı AWS ortamı; sentetik data",
+            "Local Validation",
+            "Ürün/usability doğrulama",
+            "Sentetik fixture; AWS beklemez",
         ),
-        (
-            "Production Demo",
-            "v1.0 portföy yayını",
-            "Onaylı sentetik/veri; yayın kapılı",
-        ),
+        ("AWS Evidence", "Deploy/recovery kanıtı", "Sentetik; <=24 saatte destroy"),
     ]
     for index, row in enumerate(rows, start=1):
         top = row_positions[index] + 2
@@ -526,8 +583,8 @@ def draw_page_20(target: canvas.Canvas) -> None:
             "ECR’da immutable commit-SHA image; ECS/Fargate API ve ayrı Celery worker.",
             "Public ALB + ACM; ECS, RDS PostgreSQL+pgvector ve ElastiCache private subnetlerde.",
             "Private, encrypted, versioned S3; Secrets Manager; CloudWatch/CloudTrail/Budgets.",
-            "Terraform ile staging ve production-demo ayrımı; GitHub Actions OIDC ile geçici kimlik.",
-            "Çoklu API task öncesi browser session state ElastiCache’e taşınır.",
+            "Tek kısa ömürlü evidence environment; GitHub Actions OIDC ile geçici kimlik.",
+            "ClamAV worker sidecar; USD 10/25/50 uyarıları, USD 120 emergency ceiling.",
         ],
         size=8.7,
         leading=10.3,
@@ -550,6 +607,7 @@ def draw_page_20(target: canvas.Canvas) -> None:
         "Login, ticket, document, worker ve AI smoke akışları çalıştırılır.",
         "Uygulama hatasında önceki ECS revision’a dönülür; migration için forward-fix esastır.",
         "Veri olayı varsa doğrulanmış RDS point-in-time restore prosedürü kullanılır.",
+        "Arındırılmış kanıt alınır; disposable AWS kaynakları 24 saat içinde destroy ve verify edilir.",
     ]
     for number, step in enumerate(steps, start=1):
         height = paragraph_top(
@@ -558,13 +616,97 @@ def draw_page_20(target: canvas.Canvas) -> None:
             cursor,
             504,
             f"{number}.&nbsp;&nbsp;{step}",
-            size=8.7,
-            leading=10.3,
+            size=8.3,
+            leading=9.8,
         )
         cursor += height + 1
 
 
+def draw_page_21(target: canvas.Canvas) -> None:
+    whiteout(target, 53, 49, 506, 120)
+    text_top(
+        target,
+        54,
+        50,
+        "14.4 Sürüm kilometre taşları",
+        font="Arial-Bold",
+        size=14,
+        color=ACCENT_BLUE,
+    )
+    rows = [
+        ("Sürüm", "Hafta", "Kanıt çıktısı"),
+        (
+            "v0.1 Alpha",
+            "5",
+            "AWS foundation + deploy/rollback/restore/destroy evidence",
+        ),
+        ("v0.5 Beta", "9", "AI/RAG beta; gerekirse yeni kısa AWS evidence window"),
+        ("v0.9 RC", "11", "Hardening ve release kanıt provası; kalıcı servis yok"),
+        ("v1.0", "12", "Arındırılmış kanıt, README, video ve portföy paketi"),
+    ]
+    columns = [54, 150, 198, 558]
+    positions = [69, 84, 105, 126, 147, 168]
+    for index in range(len(rows)):
+        fill_top(
+            target,
+            54,
+            positions[index],
+            504,
+            positions[index + 1] - positions[index],
+            BLUE if index == 0 else (WHITE if index % 2 else LIGHT_GRAY),
+        )
+        color = WHITE if index == 0 else BLACK
+        font = "Arial-Bold" if index == 0 else "Arial"
+        top = positions[index] + 3
+        text_top(target, 59, top, rows[index][0], font=font, size=7.4, color=color)
+        text_top(target, 155, top, rows[index][1], font=font, size=7.4, color=color)
+        paragraph_top(
+            target,
+            203,
+            top,
+            349,
+            rows[index][2],
+            font=font,
+            size=7.4,
+            leading=8.5,
+            color=color,
+        )
+    draw_grid(target, columns, positions)
+
+
 def draw_page_23(target: canvas.Canvas) -> None:
+    whiteout(target, 53, 49, 506, 178)
+    text_top(
+        target,
+        54,
+        50,
+        "15.8 README ve portföy bölümleri",
+        font="Arial-Bold",
+        size=14,
+        color=ACCENT_BLUE,
+    )
+    bullet_lines(
+        target,
+        72,
+        [
+            "Problem, hedef niş ve ürün değeri",
+            "Pazar örnekleri ve SupportFlow’un farklılaşması",
+            "Arındırılmış AWS kanıtı, demo videosu ve local yeniden üretim adımları",
+            "Mimari diagram ve request flow",
+            "Stack ve nedenleri",
+            "Local setup ve environment variables",
+            "Database/tenant modeli ve connector adapter yaklaşımı",
+            "LLM/RAG pipeline, Türkçe evaluation ve no-answer yaklaşımı",
+            "Test/CI/CD ve deployment",
+            "Security, KVKK yayın kapısı ve bilinen sınırlamalar",
+            "Pilot metrikleri, trade-off’lar ve v1.1 roadmap",
+            "Emir ve Eray’ın katkı özeti; ikisinin de AI/RAG katkıları",
+        ],
+        size=8.6,
+        leading=9.7,
+        gap=0,
+    )
+
     top, bottom = 390.65, 410.05
     whiteout(target, 54, top, 504, bottom - top)
     fill_top(target, 54, top, 504, bottom - top, WHITE)
@@ -573,9 +715,104 @@ def draw_page_23(target: canvas.Canvas) -> None:
     text_top(target, 185, top + 5, "Düşük/Orta", size=7.1)
     text_top(target, 311, top + 1, "Deploy, bölge veya", size=7.1)
     text_top(target, 311, top + 9, "kota problemi", size=7.1)
-    text_top(target, 437, top + 1, "IaC, runbook, local Docker,", size=6.8)
-    text_top(target, 437, top + 9, "budget alarmı", size=6.8)
+    text_top(target, 437, top + 1, "IaC, local Docker, 24h destroy,", size=6.2)
+    text_top(target, 437, top + 9, "USD 10/25/50 uyarıları", size=6.2)
     draw_grid(target, [54, 180, 306, 432, 558], [top, bottom])
+
+
+def draw_page_24(target: canvas.Canvas) -> None:
+    whiteout(target, 53, 337, 506, 18)
+    target.setFillColor(WHITE)
+    target.setStrokeColor(colors.HexColor("#666666"))
+    target.setLineWidth(0.6)
+    target.rect(54, y_from_top(341, 7), 7, 7, fill=0, stroke=1)
+    text_top(
+        target,
+        66,
+        340,
+        "Kalıcı demo hesabı yerine arındırılmış AWS kanıtı ve local demo adımları doğrulandı.",
+        size=8.8,
+    )
+
+
+def draw_page_27(target: canvas.Canvas) -> None:
+    whiteout(target, 53, 49, 506, 132)
+    text_top(
+        target,
+        54,
+        50,
+        "Ek E - Nihai görev matrisi özeti",
+        font="Arial-Bold",
+        size=16,
+        color=BLUE,
+    )
+    rows = [
+        ("Çıktı", "Emir", "Eray", "Ortak entegrasyon"),
+        (
+            "Identity/tenant",
+            "Ana implementasyon",
+            "Security test/review",
+            "Threat model",
+        ),
+        ("Ticket", "Review + approval", "Ana implementasyon", "E2E akış"),
+        ("Celery", "Idempotency hardening", "Temel altyapı", "Failure test"),
+        ("LLM", "Client/structured output", "Classification/prompt", "İlk çağrı pair"),
+        (
+            "RAG ingestion",
+            "Chunking/version",
+            "Embedding/vector",
+            "Parametre deneyleri",
+        ),
+        (
+            "RAG answer",
+            "Retrieval/citation",
+            "Generation/no-answer",
+            "Ana pipeline pair",
+        ),
+        (
+            "Feedback/eval",
+            "Product metrics",
+            "Eval runner/metrics",
+            "Regression review",
+        ),
+        (
+            "DevOps",
+            "App integration/review",
+            "Terraform/OIDC/apply",
+            "Evidence + destroy",
+        ),
+        (
+            "Dokümantasyon",
+            "Product/demo/ADR",
+            "Runbook/evaluation",
+            "README/mimari sunum",
+        ),
+    ]
+    columns = [54, 180, 306, 432, 558]
+    positions = [74 + 10.6 * index for index in range(len(rows) + 1)]
+    for index, row in enumerate(rows):
+        fill_top(
+            target,
+            54,
+            positions[index],
+            504,
+            positions[index + 1] - positions[index],
+            BLUE if index == 0 else (WHITE if index % 2 else LIGHT_GRAY),
+        )
+        color = WHITE if index == 0 else BLACK
+        font = "Arial-Bold" if index == 0 else "Arial"
+        top = positions[index] + 1.5
+        for column, value in enumerate(row):
+            text_top(
+                target,
+                columns[column] + 5,
+                top,
+                value,
+                font=font,
+                size=6.7,
+                color=color,
+            )
+    draw_grid(target, columns, positions)
 
 
 PAGE_DRAWERS = {
@@ -588,20 +825,31 @@ PAGE_DRAWERS = {
     14: draw_page_14,
     17: draw_page_17,
     20: draw_page_20,
+    21: draw_page_21,
     23: draw_page_23,
+    24: draw_page_24,
+    27: draw_page_27,
 }
 
 REDACTIONS = {
     1: [(78, 296, 534, 370), (52, 427, 560, 469)],
     2: [(53, 267, 383, 285)],
-    3: [(54, 288.55, 558, 309.05), (54, 353, 558, 402)],
+    3: [(54, 288.55, 558, 309.05), (54, 353, 558, 402), (54, 410, 558, 459)],
     4: [(390, 434.45, 558, 456.25)],
     5: [(306, 105.55, 558, 127.35), (222, 652.05, 390, 673.85)],
     7: [(390, 80.35, 558, 211.15)],
     14: [(53, 168, 558, 514)],
-    17: [(54, 642, 558, 658)],
+    17: [
+        (54, 395, 558, 411),
+        (54, 539, 558, 555),
+        (54, 642, 558, 658),
+        (54, 702, 558, 718),
+    ],
     20: [(52, 312, 561, 728)],
-    23: [(54, 390.65, 558, 410.05)],
+    21: [(53, 49, 559, 169)],
+    23: [(53, 49, 559, 227), (54, 390.65, 558, 410.05)],
+    24: [(53, 337, 559, 355)],
+    27: [(53, 49, 559, 181)],
 }
 
 
@@ -624,19 +872,19 @@ def redact_original_content(source: Path) -> BytesIO:
     """
 
     try:
-        import fitz  # type: ignore[import-not-found]
+        import pymupdf  # type: ignore[import-not-found]
     except ImportError as exc:
         raise RuntimeError(
             "PyMuPDF is required for true PDF redaction. "
             "Run with `uv run --with PyMuPDF python ...`."
         ) from exc
 
-    document: Any = fitz.open(source)
+    document: Any = pymupdf.open(source)
     for page_number, rectangles in REDACTIONS.items():
         page = document[page_number - 1]
         for x0, top, x1, bottom in rectangles:
             page.add_redact_annot(
-                fitz.Rect(x0, top, x1, bottom),
+                pymupdf.Rect(x0, top, x1, bottom),
                 fill=(1, 1, 1),
                 cross_out=False,
             )
@@ -654,17 +902,68 @@ def redact_original_content(source: Path) -> BytesIO:
     return result
 
 
+def validate_source_pdf(source: Path) -> PdfReader:
+    """Validate the immutable layout contract before using page coordinates."""
+
+    if not source.is_file():
+        raise ValueError(
+            f"Unsupported source PDF: {source} is not a readable file. "
+            f"Expected the {EXPECTED_SOURCE_PAGE_COUNT}-page AWS Revision "
+            f"{EXPECTED_SOURCE_REVISION} PDF from commit {EXPECTED_SOURCE_COMMIT}."
+        )
+
+    try:
+        reader = PdfReader(source)
+        page_count = len(reader.pages)
+        title = reader.metadata.title if reader.metadata is not None else None
+        first_page_text = reader.pages[0].extract_text() if page_count else ""
+    except Exception as exc:
+        raise ValueError(
+            f"Unsupported source PDF: {source} could not be read. Expected the "
+            f"{EXPECTED_SOURCE_PAGE_COUNT}-page AWS Revision "
+            f"{EXPECTED_SOURCE_REVISION} PDF from commit {EXPECTED_SOURCE_COMMIT}."
+        ) from exc
+
+    mismatches: list[str] = []
+    if page_count != EXPECTED_SOURCE_PAGE_COUNT:
+        mismatches.append(
+            f"page count {page_count!r} (expected {EXPECTED_SOURCE_PAGE_COUNT})"
+        )
+    if title != EXPECTED_SOURCE_TITLE:
+        mismatches.append(f"title {title!r} (expected {EXPECTED_SOURCE_TITLE!r})")
+    if EXPECTED_SOURCE_REVISION_MARKER not in (first_page_text or ""):
+        mismatches.append(
+            "first-page revision marker missing "
+            f"(expected {EXPECTED_SOURCE_REVISION_MARKER!r})"
+        )
+
+    if mismatches:
+        details = "; ".join(mismatches)
+        raise ValueError(
+            f"Unsupported source PDF: {details}. Recover the exact Revision "
+            f"{EXPECTED_SOURCE_REVISION} source from Git commit "
+            f"{EXPECTED_SOURCE_COMMIT} using the README instructions before "
+            "running this generator."
+        )
+
+    return reader
+
+
 def revise_pdf(source: Path, output: Path) -> None:
     if source.resolve() == output.resolve():
         raise ValueError(
             "Source and output must differ so the original can be reviewed."
         )
 
+    validate_source_pdf(source)
     register_fonts()
     redacted_source = redact_original_content(source)
     reader = PdfReader(redacted_source)
-    if len(reader.pages) != 29:
-        raise ValueError(f"Expected 29 pages, found {len(reader.pages)}.")
+    if len(reader.pages) != EXPECTED_SOURCE_PAGE_COUNT:
+        raise RuntimeError(
+            "PDF redaction unexpectedly changed the source page count: "
+            f"expected {EXPECTED_SOURCE_PAGE_COUNT}, found {len(reader.pages)}."
+        )
 
     writer = PdfWriter()
     for page_number, page in enumerate(reader.pages, start=1):
@@ -674,16 +973,19 @@ def revise_pdf(source: Path, output: Path) -> None:
             page.merge_page(overlay.pages[0], over=True)
         writer.add_page(page)
 
-    metadata = dict(reader.metadata or {})
+    metadata: dict[str, Any] = dict(reader.metadata or {})
     metadata.update(
         {
-            "/Title": "SupportFlow AI - Uçtan Uca Proje Planı (AWS Revision 1.2)",
+            "/Title": "SupportFlow AI - Uçtan Uca Proje Planı (AWS Revision 1.3)",
             "/Author": "Emir and Eray",
             "/Subject": (
-                "12 haftalık AWS-aligned geliştirme, deployment, doğrulama ve "
-                "portföy planı"
+                "12 haftalık geliştirme ve kısa ömürlü AWS production-shaped "
+                "portföy kanıt planı"
             ),
-            "/Keywords": "SupportFlow AI, AWS, ECS, Fargate, RDS, ElastiCache, S3",
+            "/Keywords": (
+                "SupportFlow AI, AWS, ECS, Fargate, RDS, ElastiCache, S3, "
+                "Terraform, OIDC, ephemeral portfolio evidence"
+            ),
         }
     )
     writer.add_metadata(metadata)
@@ -694,9 +996,23 @@ def revise_pdf(source: Path, output: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("source", type=Path)
-    parser.add_argument("output", type=Path)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate Revision 1.3 from the 29-page AWS Revision 1.2 PDF "
+            f"stored at Git commit {EXPECTED_SOURCE_COMMIT}."
+        ),
+        epilog=(
+            "The source must have the expected page count, metadata title, and "
+            "first-page Revision 1.2 marker. See README.md for the binary-safe "
+            "source recovery command."
+        ),
+    )
+    parser.add_argument(
+        "source",
+        type=Path,
+        help="29-page AWS Revision 1.2 source recovered from commit 4b869d2",
+    )
+    parser.add_argument("output", type=Path, help="Revision 1.3 output path")
     return parser.parse_args()
 
 

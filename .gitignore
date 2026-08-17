@@ -29,6 +29,7 @@ Thumbs.db
 # Build and package output
 build/
 dist/
+output/
 *.egg-info/
 
 # Logs and local runtime data

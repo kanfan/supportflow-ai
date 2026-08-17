@@ -5,6 +5,7 @@
 - Owners: Emir and Eray
 - Tracks: #37, #38, #39, and #40
 - Prerequisite: Week 4 merged into `main` as `4913064`
+- Lifecycle refinement: ADR 0007
 
 ## Context
 
@@ -19,7 +20,9 @@ administering an AWS account.
 
 This is an ownership change, not an architectural change. ADR 0004 remains the
 authority for region, topology, private networking, managed services, OIDC,
-budgets, backups, rollback, and acceptance evidence.
+backups, rollback, and acceptance evidence. ADR 0007 is the authority for the
+ephemeral portfolio-evidence purpose, lifecycle, cost thresholds, synthetic-data
+boundary, and 24-hour teardown deadline.
 
 The handoff must avoid two failure modes:
 
@@ -115,7 +118,7 @@ ADR 0006 accepted
   |-> #38 local adapters + contract tests
   \-> #39 deployment pipeline scaffolding
   -> #37 safety/state/plan/teardown gates reviewed
-  -> Eray performs persistent staging apply
+  -> Eray creates the short-lived portfolio evidence environment
   -> sanitized #37 outputs + contract-ready #38 + pipeline-ready #39
   -> live integration and staging release
   -> #40 technical acceptance
@@ -124,10 +127,11 @@ ADR 0006 accepted
 
 The first three work streams begin in parallel after this ADR is accepted. #38
 may implement local adapters and contract tests, and #39 may build pipeline
-scaffolding, while #37 establishes the platform. Persistent AWS resources are
-not applied before #37's account-safety, budget, state, reviewed-plan, and
-teardown gates pass. Live #38/#39 integration waits for the relevant sanitized
-#37 outputs.
+scaffolding, while #37 establishes the platform. The short-lived AWS evidence
+environment is not created before #37's account-safety, budget, state,
+reviewed-plan, and teardown gates pass. Live #38/#39 integration waits for the
+relevant sanitized #37 outputs. After #40 evidence is captured, disposable AWS
+resources are destroyed and verified within 24 hours under ADR 0007.
 
 ### Platform handoff contract
 
@@ -144,7 +148,8 @@ The #37 handoff is repository-based and includes:
   configuration contracts;
 - deploy, rollback, RDS restore, S3 version recovery, cost response, and destroy
   runbooks;
-- expected idle cost, one-NAT failure domain, manual console prerequisites, and
+- whole-window cost estimate, USD 10/25/50 early-warning response, USD 120
+  emergency ceiling, one-NAT failure domain, manual console prerequisites, and
   remaining risks.
 
 Console-only configuration is recorded as a temporary prerequisite and either
@@ -207,10 +212,14 @@ Week 5 is complete only after #40 records:
 - private network, least-privilege IAM, OIDC, alarm, budget, and teardown
   evidence;
 - exact commit, image digest, task definitions, migration revision, and CI runs.
+- resource inventory plus successful destroy evidence captured within 24 hours
+  of the verification window.
 
 Product validation is intentionally not performed before this technical gate.
-After #40 passes, the team creates and runs the separate two-user task-based
-usability validation required by the revised project timeline.
+After #40 passes, the team may run the separate two-user task-based usability
+validation required by the revised project timeline. It uses the local stack or
+a newly created synthetic demo window; AWS resources are not kept alive while
+waiting for product feedback.
 
 ### Distributed handoff risk
 
@@ -255,7 +264,7 @@ must be able to explain it.
 - Sharing AWS root or administrator credentials
 - Giving Emir responsibility for account creation or billing configuration
 - Console-only infrastructure with no reproducible repository representation
-- Production-demo or real-customer deployment in Week 5
+- Persistent production-demo or real-customer deployment in Week 5
 - Changing the AWS topology selected by ADR 0004
 - EKS, microservices, multi-region, or autoscaling work
 - Product validation before the technical staging alpha is usable
