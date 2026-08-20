@@ -6,7 +6,11 @@ import pytest
 from pydantic import SecretStr
 
 from app.config import Settings
-from app.documents.composition import DocumentScannerConfigurationError
+from app.documents.clamd import ClamdDocumentSafetyScanner
+from app.documents.composition import (
+    DocumentScannerConfigurationError,
+    resolve_document_safety_scanner,
+)
 from app.documents.ports import (
     DocumentScanResult,
     FakeDocumentSafetyScanner,
@@ -101,3 +105,23 @@ def test_fake_scanner_gate_times_out_as_unavailable(tmp_path: Path) -> None:
     )
 
     assert scanner.scan(BytesIO(b"safe")) is DocumentScanResult.UNAVAILABLE
+
+
+def test_clamd_mode_builds_the_concrete_loopback_adapter() -> None:
+    scanner = resolve_document_safety_scanner(
+        Settings(environment="test", document_scanner_mode="clamd"),
+        None,
+    )
+
+    assert isinstance(scanner, ClamdDocumentSafetyScanner)
+
+
+def test_clamd_mode_rejects_an_arbitrary_injected_external_adapter() -> None:
+    with pytest.raises(
+        DocumentScannerConfigurationError,
+        match="concrete ClamD adapter",
+    ):
+        resolve_document_safety_scanner(
+            Settings(environment="test", document_scanner_mode="clamd"),
+            ConfiguredExternalScanner(),
+        )

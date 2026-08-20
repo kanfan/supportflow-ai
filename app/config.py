@@ -107,7 +107,29 @@ class Settings(BaseSettings):
         ge=1,
         le=10 * 1024 * 1024,
     )
-    document_scanner_mode: Literal["fake", "external"] = "fake"
+    document_scanner_mode: Literal["fake", "external", "clamd"] = "fake"
+    document_clamd_host: str = "127.0.0.1"
+    document_clamd_port: int = Field(default=3310, ge=1, le=65_535)
+    document_scanner_connect_timeout_seconds: int = Field(
+        default=2,
+        ge=1,
+        le=10,
+    )
+    document_scanner_scan_timeout_seconds: int = Field(
+        default=60,
+        ge=1,
+        le=600,
+    )
+    document_scanner_signature_max_age_seconds: int = Field(
+        default=24 * 60 * 60,
+        ge=60,
+        le=7 * 24 * 60 * 60,
+    )
+    document_scanner_clock_skew_tolerance_seconds: int = Field(
+        default=5 * 60,
+        ge=0,
+        le=60 * 60,
+    )
     document_fake_scanner_gate_path: Path | None = None
     document_fake_scanner_gate_timeout_seconds: int = Field(
         default=120,
@@ -122,12 +144,12 @@ class Settings(BaseSettings):
     )
     document_ingestion_max_retries: int = Field(default=3, ge=0, le=10)
     document_ingestion_soft_time_limit_seconds: int = Field(
-        default=60,
+        default=120,
         ge=1,
         le=600,
     )
     document_ingestion_hard_time_limit_seconds: int = Field(
-        default=75,
+        default=135,
         ge=2,
         le=900,
     )
@@ -183,11 +205,26 @@ class Settings(BaseSettings):
                 "Document fake scanner gate is restricted to local/test fake mode"
             )
         if (
+            self.environment in {"staging", "production"}
+            and self.document_scanner_mode == "clamd"
+            and self.document_clamd_host != "127.0.0.1"
+        ):
+            raise ValueError(
+                "SUPPORTFLOW_DOCUMENT_CLAMD_HOST must be 127.0.0.1 outside local/test"
+            )
+        if (
             self.document_ingestion_hard_time_limit_seconds
             <= self.document_ingestion_soft_time_limit_seconds
         ):
             raise ValueError(
                 "Document ingestion hard time limit must exceed the soft time limit"
+            )
+        if (
+            self.document_scanner_scan_timeout_seconds
+            >= self.document_ingestion_soft_time_limit_seconds
+        ):
+            raise ValueError(
+                "Document scanner timeout must be shorter than the ingestion soft time limit"
             )
         if (
             self.environment in {"staging", "production"}
