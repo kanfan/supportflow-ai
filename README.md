@@ -8,7 +8,7 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > organization context, admin/agent membership controls, tenant-scoped ticket
 > workflows, append-only audit events, the authenticated agent workspace, secure
 > document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
-> automated suite contains 250 tests and passes with PostgreSQL and Redis integration
+> automated suite contains 281 tests and passes with PostgreSQL and Redis integration
 > enabled. Week 5 AWS staging delivery is now in progress; no AWS staging
 > deployment is claimed yet. AI classification and RAG remain follow-up
 > milestones.
@@ -141,7 +141,7 @@ accepted ownership and handoff contract in
 
 - [x] ADR 0006 defines the AWS ownership, credential, apply, handoff, and dependency boundaries.
 - [ ] #37 provisions the reviewed AWS platform foundation and publishes sanitized outputs and runbooks.
-- [ ] #38 supplies the S3/scanner/session/readiness application adapters.
+- [x] #38 supplies the S3/scanner/session/readiness application adapters.
 - [ ] #39 deploys one immutable image digest through scoped GitHub OIDC.
 - [ ] #40 records integrated staging, rollback, recovery, security, cost, and teardown evidence.
 - [ ] Sanitized deployment evidence is retained and disposable AWS resources
@@ -158,6 +158,11 @@ Ownership means leading and explaining a feature, not working alone.
 | #39 GitHub OIDC and immutable deployment pipeline | Eray | Emir |
 | #40 AWS staging technical verification | Emir | Eray |
 | Product validation after #40 | Emir | Eray |
+
+The #39 pipeline scaffold is documented in
+[AWS deployment pipeline](./docs/aws-deployment-pipeline.md). It is manual and
+protected by design: missing #37 environment outputs fail before OIDC is
+requested, and no live AWS deployment is claimed until #40 evidence exists.
 
 After ADR 0006 acceptance, #37 platform work, #38 local adapter/contract work,
 and #39 pipeline scaffolding can proceed in parallel. Persistent AWS apply waits
