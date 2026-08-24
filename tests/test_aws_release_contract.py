@@ -35,8 +35,23 @@ def deployment_environment() -> dict[str, str]:
         "SUPPORTFLOW_ECS_SUBNET_IDS": "subnet-abc123,subnet-def456",
         "SUPPORTFLOW_ECS_SECURITY_GROUP_IDS": "sg-abc123",
         "SUPPORTFLOW_ALB_BASE_URL": "https://staging.example.test",
-        "SUPPORTFLOW_CLOUDWATCH_LOG_GROUP": "/supportflow/staging",
+        "SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS": "/supportflow/staging,/supportflow/worker",
         "SUPPORTFLOW_MIGRATION_BACKUP_CONFIRMED": "true",
+        "GITHUB_REPOSITORY": "kanfan/supportflow-ai",
+        "GITHUB_REF": "refs/heads/main",
+        "SUPPORTFLOW_RELEASE_OPERATION": "deploy",
+        "SUPPORTFLOW_ALLOWED_DEPLOY_REF": "refs/heads/main",
+        "SUPPORTFLOW_OIDC_AUDIENCE": "sts.amazonaws.com",
+        "SUPPORTFLOW_OIDC_SUBJECT": "repo:kanfan/supportflow-ai:environment:staging",
+        "SUPPORTFLOW_ENVIRONMENT_REVIEW_REQUIRED": "true",
+        "SUPPORTFLOW_ENVIRONMENT_NO_SELF_REVIEW": "true",
+        "SUPPORTFLOW_BACKUP_REFERENCE": "backup:staging:2026-08-24T1200Z",
+        "SUPPORTFLOW_SCHEMA_COMPATIBILITY_REFERENCE": "schema:0004_documents",
+        "SUPPORTFLOW_SMOKE_ORGANIZATION_ID": "00000000-0000-0000-0000-000000000001",
+        "SUPPORTFLOW_SMOKE_EMAIL": "smoke@example.test",
+        "SUPPORTFLOW_SMOKE_PASSWORD": "not-a-real-password",
+        "SUPPORTFLOW_SMOKE_INITIAL_BODY": "initial smoke canary",
+        "SUPPORTFLOW_SMOKE_FOLLOWUP_BODY": "followup smoke canary",
     }
 
 
@@ -130,9 +145,16 @@ def test_release_evidence_is_allowlisted_and_contains_digest_not_registry_url(
         commit_sha="b" * 40,
         image_uri=IMAGE,
         environment="staging",
+        operation="deploy",
+        release_started_at="2026-08-24T12:00:00Z",
+        backup_reference="backup:staging:2026-08-24T1200Z",
+        schema_compatibility_reference="schema:0004_documents",
         migration_revision="0004_documents",
         api_task_definition="supportflow-api:7",
         worker_task_definition="supportflow-worker:8",
+        previous_api_task_definition="supportflow-api:6",
+        previous_worker_task_definition="supportflow-worker:6",
+        previous_image_digest="sha256:" + "b" * 64,
         smoke_status="passed",
     )
     output = tmp_path / "release-evidence.json"
@@ -144,3 +166,54 @@ def test_release_evidence_is_allowlisted_and_contains_digest_not_registry_url(
     assert set(json.loads(serialized)) == set(evidence)
     with pytest.raises(ReleaseContractError, match="allowlisted"):
         write_release_evidence(output, {**evidence, "secret": "must-not-write"})
+
+
+def test_migration_result_uses_named_container_even_when_sidecar_is_first() -> None:
+    from scripts.aws.release_contract import validate_migration_task_result
+
+    validate_migration_task_result(
+        {
+            "tasks": [
+                {
+                    "taskArn": "arn:aws:ecs:task/migration",
+                    "lastStatus": "STOPPED",
+                    "stopCode": "EssentialContainerExited",
+                    "stoppedReason": "Essential container in task exited",
+                    "containers": [
+                        {"name": "clamd", "lastStatus": "STOPPED", "exitCode": 0},
+                        {"name": "migration", "lastStatus": "STOPPED", "exitCode": 0},
+                    ],
+                }
+            ],
+            "failures": [],
+        },
+        "migration",
+    )
+
+
+def test_migration_result_rejects_named_container_failure() -> None:
+    from scripts.aws.release_contract import validate_migration_task_result
+
+    with pytest.raises(ReleaseContractError, match="did not exit successfully"):
+        validate_migration_task_result(
+            {
+                "tasks": [
+                    {
+                        "taskArn": "arn:aws:ecs:task/migration",
+                        "lastStatus": "STOPPED",
+                        "stopCode": "EssentialContainerExited",
+                        "stoppedReason": "Essential container in task exited",
+                        "containers": [
+                            {"name": "clamd", "lastStatus": "STOPPED", "exitCode": 0},
+                            {
+                                "name": "migration",
+                                "lastStatus": "STOPPED",
+                                "exitCode": 1,
+                            },
+                        ],
+                    }
+                ],
+                "failures": [],
+            },
+            "migration",
+        )

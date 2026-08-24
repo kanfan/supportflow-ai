@@ -27,6 +27,18 @@ on:
         description: Previous compatible worker family:revision (rollback only)
         required: false
         type: string
+      previous_release_image:
+        description: Previous immutable repository@sha256 image (rollback only)
+        required: false
+        type: string
+      backup_reference:
+        description: Fresh backup/check reference or fresh-environment marker
+        required: true
+        type: string
+      schema_compatibility_reference:
+        description: Per-run schema compatibility confirmation/reference
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -67,14 +79,33 @@ jobs:
       SUPPORTFLOW_ECS_SUBNET_IDS: ${{ vars.SUPPORTFLOW_ECS_SUBNET_IDS }}
       SUPPORTFLOW_ECS_SECURITY_GROUP_IDS: ${{ vars.SUPPORTFLOW_ECS_SECURITY_GROUP_IDS }}
       SUPPORTFLOW_ALB_BASE_URL: ${{ vars.SUPPORTFLOW_ALB_BASE_URL }}
-      SUPPORTFLOW_CLOUDWATCH_LOG_GROUP: ${{ vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUP }}
+      SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS: ${{ vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS || vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUP }}
       SUPPORTFLOW_MIGRATION_BACKUP_CONFIRMED: ${{ vars.SUPPORTFLOW_MIGRATION_BACKUP_CONFIRMED }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GITHUB_REF: ${{ github.ref }}
+      SUPPORTFLOW_RELEASE_OPERATION: ${{ inputs.operation }}
+      SUPPORTFLOW_ALLOWED_DEPLOY_REF: ${{ vars.SUPPORTFLOW_ALLOWED_DEPLOY_REF }}
+      SUPPORTFLOW_OIDC_AUDIENCE: ${{ vars.SUPPORTFLOW_OIDC_AUDIENCE }}
+      SUPPORTFLOW_OIDC_SUBJECT: ${{ vars.SUPPORTFLOW_OIDC_SUBJECT }}
+      SUPPORTFLOW_ENVIRONMENT_REVIEW_REQUIRED: ${{ vars.SUPPORTFLOW_ENVIRONMENT_REVIEW_REQUIRED }}
+      SUPPORTFLOW_ENVIRONMENT_NO_SELF_REVIEW: ${{ vars.SUPPORTFLOW_ENVIRONMENT_NO_SELF_REVIEW }}
+      SUPPORTFLOW_BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+      SUPPORTFLOW_SCHEMA_COMPATIBILITY_REFERENCE: ${{ inputs.schema_compatibility_reference }}
+      SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE: ${{ inputs.previous_release_image }}
+      SUPPORTFLOW_SMOKE_ORGANIZATION_ID: ${{ secrets.SUPPORTFLOW_SMOKE_ORGANIZATION_ID }}
+      SUPPORTFLOW_SMOKE_EMAIL: ${{ secrets.SUPPORTFLOW_SMOKE_EMAIL }}
+      SUPPORTFLOW_SMOKE_PASSWORD: ${{ secrets.SUPPORTFLOW_SMOKE_PASSWORD }}
+      SUPPORTFLOW_SMOKE_INITIAL_BODY: ${{ secrets.SUPPORTFLOW_SMOKE_INITIAL_BODY }}
+      SUPPORTFLOW_SMOKE_FOLLOWUP_BODY: ${{ secrets.SUPPORTFLOW_SMOKE_FOLLOWUP_BODY }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
       - name: Validate deployment contract without AWS credentials
         run: python scripts/aws/release_contract.py validate-config
+
+      - name: Fail closed outside the protected default branch
+        run: test "$GITHUB_REF" = "refs/heads/main"
 
       - name: Validate rollback inputs
         if: inputs.operation == 'rollback'
@@ -84,11 +115,12 @@ jobs:
         run: |
           test -n "$PREVIOUS_API_TASK_DEFINITION"
           test -n "$PREVIOUS_WORKER_TASK_DEFINITION"
+          test -n "$SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE"
 
   deploy:
     name: Build, migrate, deploy, and smoke
     needs: validate-contract
-    if: inputs.operation == 'deploy'
+    if: inputs.operation == 'deploy' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     timeout-minutes: 35
@@ -113,8 +145,11 @@ jobs:
       SUPPORTFLOW_ECS_SUBNET_IDS: ${{ vars.SUPPORTFLOW_ECS_SUBNET_IDS }}
       SUPPORTFLOW_ECS_SECURITY_GROUP_IDS: ${{ vars.SUPPORTFLOW_ECS_SECURITY_GROUP_IDS }}
       SUPPORTFLOW_ALB_BASE_URL: ${{ vars.SUPPORTFLOW_ALB_BASE_URL }}
-      SUPPORTFLOW_CLOUDWATCH_LOG_GROUP: ${{ vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUP }}
+      SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS: ${{ vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS || vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUP }}
       SUPPORTFLOW_MIGRATION_BACKUP_CONFIRMED: ${{ vars.SUPPORTFLOW_MIGRATION_BACKUP_CONFIRMED }}
+      SUPPORTFLOW_BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+      SUPPORTFLOW_SCHEMA_COMPATIBILITY_REFERENCE: ${{ inputs.schema_compatibility_reference }}
+      SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE: ${{ inputs.previous_release_image }}
       SUPPORTFLOW_SMOKE_ORGANIZATION_ID: ${{ secrets.SUPPORTFLOW_SMOKE_ORGANIZATION_ID }}
       SUPPORTFLOW_SMOKE_EMAIL: ${{ secrets.SUPPORTFLOW_SMOKE_EMAIL }}
       SUPPORTFLOW_SMOKE_PASSWORD: ${{ secrets.SUPPORTFLOW_SMOKE_PASSWORD }}
@@ -124,12 +159,51 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Record release start before AWS mutation
+        id: release-meta
+        run: echo "release_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Configure AWS credentials through GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ vars.SUPPORTFLOW_AWS_ROLE_ARN }}
           role-session-name: supportflow-release-${{ github.run_id }}
+
+      - name: Capture currently deployed revisions and digest
+        id: previous-release
+        run: |
+          set -euo pipefail
+          aws ecs describe-services --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
+            --services "$SUPPORTFLOW_ECS_API_SERVICE" "$SUPPORTFLOW_ECS_WORKER_SERVICE" \
+            --output json > "$RUNNER_TEMP/current-services.json"
+          python - "$RUNNER_TEMP/current-services.json" <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          payload = json.loads(Path(os.environ["RUNNER_TEMP"] + "/current-services.json").read_text())
+          services = payload.get("services", [])
+          if len(services) != 2 or any(not service.get("taskDefinition") for service in services):
+              raise SystemExit("expected both current ECS service task definitions")
+          expected = {os.environ["SUPPORTFLOW_ECS_API_SERVICE"], os.environ["SUPPORTFLOW_ECS_WORKER_SERVICE"]}
+          if {service.get("serviceName") for service in services} != expected:
+              raise SystemExit("ECS service response did not match requested services")
+          for service in services:
+              key = "api" if service["serviceName"] == os.environ["SUPPORTFLOW_ECS_API_SERVICE"] else "worker"
+              ref = service["taskDefinition"].rsplit("/", 1)[-1]
+              print(f"{key}_task_definition={ref}")
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+                  output.write(f"{key}_task_definition={ref}\n")
+          PY
+          API_CURRENT_ARN="$(aws ecs describe-services --cluster "$SUPPORTFLOW_ECS_CLUSTER" --services "$SUPPORTFLOW_ECS_API_SERVICE" --query 'services[0].taskDefinition' --output text)"
+          WORKER_CURRENT_ARN="$(aws ecs describe-services --cluster "$SUPPORTFLOW_ECS_CLUSTER" --services "$SUPPORTFLOW_ECS_WORKER_SERVICE" --query 'services[0].taskDefinition' --output text)"
+          aws ecs describe-task-definition --task-definition "$API_CURRENT_ARN" --query taskDefinition --output json > "$RUNNER_TEMP/current-api.json"
+          aws ecs describe-task-definition --task-definition "$WORKER_CURRENT_ARN" --query taskDefinition --output json > "$RUNNER_TEMP/current-worker.json"
+          API_DIGEST="$(python scripts/aws/release_contract.py extract-task-definition-digest "$RUNNER_TEMP/current-api.json" --container-name "$SUPPORTFLOW_ECS_API_CONTAINER_NAME")"
+          WORKER_DIGEST="$(python scripts/aws/release_contract.py extract-task-definition-digest "$RUNNER_TEMP/current-worker.json" --container-name "$SUPPORTFLOW_ECS_WORKER_CONTAINER_NAME")"
+          test "$API_DIGEST" = "$WORKER_DIGEST"
+          echo "image_digest=$API_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "Captured current API/worker revisions and matching digest"
 
       - name: Authenticate Docker to ECR
         id: ecr
@@ -273,21 +347,26 @@ jobs:
         run: |
           set -euo pipefail
           NETWORK_CONFIGURATION="awsvpcConfiguration={subnets=[$SUPPORTFLOW_ECS_SUBNET_IDS],securityGroups=[$SUPPORTFLOW_ECS_SECURITY_GROUP_IDS],assignPublicIp=DISABLED}"
-          TASK_ARN="$(aws ecs run-task \
+          aws ecs run-task \
             --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
             --task-definition "$MIGRATION_TASK_DEFINITION" \
             --launch-type FARGATE \
             --network-configuration "$NETWORK_CONFIGURATION" \
-            --query 'tasks[0].taskArn' --output text)"
-          test -n "$TASK_ARN" && test "$TASK_ARN" != "None"
+            --output json > "$RUNNER_TEMP/migration-run.json"
+          python scripts/aws/release_contract.py validate-run-task-result "$RUNNER_TEMP/migration-run.json"
+          TASK_ARN="$(python - "$RUNNER_TEMP/migration-run.json" <<'PY'
+          import json
+          import sys
+          from scripts.aws.release_contract import run_task_arn
+          print(run_task_arn(json.loads(open(sys.argv[1], encoding="utf-8").read())))
+          PY
+          )"
           aws ecs wait tasks-stopped --cluster "$SUPPORTFLOW_ECS_CLUSTER" --tasks "$TASK_ARN"
-          EXIT_CODE="$(aws ecs describe-tasks \
-            --cluster "$SUPPORTFLOW_ECS_CLUSTER" --tasks "$TASK_ARN" \
-            --query 'tasks[0].containers[0].exitCode' --output text)"
-          if [ "$EXIT_CODE" != "0" ]; then
-            echo "Migration task failed; service promotion was not attempted" >&2
-            exit 1
-          fi
+          aws ecs describe-tasks --cluster "$SUPPORTFLOW_ECS_CLUSTER" --tasks "$TASK_ARN" \
+            --output json > "$RUNNER_TEMP/migration-result.json"
+          python scripts/aws/release_contract.py validate-migration-result \
+            "$RUNNER_TEMP/migration-result.json" \
+            --container-name "$SUPPORTFLOW_ECS_MIGRATION_CONTAINER_NAME"
           echo "Migration task completed successfully"
 
       - name: Promote API and worker using the same release image
@@ -316,11 +395,15 @@ jobs:
       - name: Scan CloudWatch release logs without echoing them
         run: |
           set -euo pipefail
-          START_TIME="$(( $(date +%s) - 900 ))000"
-          aws logs filter-log-events \
-            --log-group-name "$SUPPORTFLOW_CLOUDWATCH_LOG_GROUP" \
-            --start-time "$START_TIME" \
-            --query 'events[].message' --output text > "$RUNNER_TEMP/service.log"
+          START_TIME="$(date -d '${{ steps.release-meta.outputs.release_started_at }}' +%s)000"
+          : > "$RUNNER_TEMP/service.log"
+          IFS=',' read -ra LOG_GROUPS <<< "$SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS"
+          for log_group in "${LOG_GROUPS[@]}"; do
+            aws logs filter-log-events \
+              --log-group-name "$log_group" \
+              --start-time "$START_TIME" \
+              --query 'events[].message' --output text >> "$RUNNER_TEMP/service.log"
+          done
           python scripts/week3_sensitive_scan.py "$RUNNER_TEMP/service.log" \
             --forbid "$SUPPORTFLOW_SMOKE_PASSWORD" \
             --forbid "$SUPPORTFLOW_SMOKE_INITIAL_BODY" \
@@ -331,6 +414,9 @@ jobs:
           IMAGE_URI: ${{ steps.image.outputs.image_uri }}
           API_TASK_DEFINITION: ${{ steps.task-definitions.outputs.api }}
           WORKER_TASK_DEFINITION: ${{ steps.task-definitions.outputs.worker }}
+          PREVIOUS_API_TASK_DEFINITION: ${{ steps.previous-release.outputs.api_task_definition }}
+          PREVIOUS_WORKER_TASK_DEFINITION: ${{ steps.previous-release.outputs.worker_task_definition }}
+          PREVIOUS_IMAGE_DIGEST: ${{ steps.previous-release.outputs.image_digest }}
           MIGRATION_REVISION: ${{ steps.migration.outputs.revision }}
         run: |
           python scripts/aws/release_contract.py write-evidence \
@@ -338,9 +424,16 @@ jobs:
             --commit-sha "$GITHUB_SHA" \
             --image-uri "$IMAGE_URI" \
             --environment "$SUPPORTFLOW_DEPLOY_ENVIRONMENT" \
+            --operation deploy \
+            --release-started-at "${{ steps.release-meta.outputs.release_started_at }}" \
+            --backup-reference "$SUPPORTFLOW_BACKUP_REFERENCE" \
+            --schema-compatibility-reference "$SUPPORTFLOW_SCHEMA_COMPATIBILITY_REFERENCE" \
             --migration-revision "$MIGRATION_REVISION" \
             --api-task-definition "${API_TASK_DEFINITION##*/}" \
             --worker-task-definition "${WORKER_TASK_DEFINITION##*/}" \
+            --previous-api-task-definition "$PREVIOUS_API_TASK_DEFINITION" \
+            --previous-worker-task-definition "$PREVIOUS_WORKER_TASK_DEFINITION" \
+            --previous-image-digest "$PREVIOUS_IMAGE_DIGEST" \
             --smoke-status passed
 
       - name: Upload sanitized release evidence
@@ -354,7 +447,7 @@ jobs:
   rollback:
     name: Roll back to previous compatible task definitions
     needs: validate-contract
-    if: inputs.operation == 'rollback'
+    if: inputs.operation == 'rollback' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     timeout-minutes: 20
@@ -371,7 +464,13 @@ jobs:
       SUPPORTFLOW_ECS_WORKER_SERVICE: ${{ vars.SUPPORTFLOW_ECS_WORKER_SERVICE }}
       SUPPORTFLOW_ECS_API_TASK_FAMILY: ${{ vars.SUPPORTFLOW_ECS_API_TASK_FAMILY }}
       SUPPORTFLOW_ECS_WORKER_TASK_FAMILY: ${{ vars.SUPPORTFLOW_ECS_WORKER_TASK_FAMILY }}
+      SUPPORTFLOW_ECS_API_CONTAINER_NAME: ${{ vars.SUPPORTFLOW_ECS_API_CONTAINER_NAME }}
+      SUPPORTFLOW_ECS_WORKER_CONTAINER_NAME: ${{ vars.SUPPORTFLOW_ECS_WORKER_CONTAINER_NAME }}
       SUPPORTFLOW_ALB_BASE_URL: ${{ vars.SUPPORTFLOW_ALB_BASE_URL }}
+      SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS: ${{ vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS || vars.SUPPORTFLOW_CLOUDWATCH_LOG_GROUP }}
+      SUPPORTFLOW_BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+      SUPPORTFLOW_SCHEMA_COMPATIBILITY_REFERENCE: ${{ inputs.schema_compatibility_reference }}
+      SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE: ${{ inputs.previous_release_image }}
       SUPPORTFLOW_SMOKE_ORGANIZATION_ID: ${{ secrets.SUPPORTFLOW_SMOKE_ORGANIZATION_ID }}
       SUPPORTFLOW_SMOKE_EMAIL: ${{ secrets.SUPPORTFLOW_SMOKE_EMAIL }}
       SUPPORTFLOW_SMOKE_PASSWORD: ${{ secrets.SUPPORTFLOW_SMOKE_PASSWORD }}
@@ -381,6 +480,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Record rollback start before AWS mutation
+        id: release-meta
+        run: echo "release_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Configure AWS credentials through GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -388,16 +491,56 @@ jobs:
           role-to-assume: ${{ vars.SUPPORTFLOW_AWS_ROLE_ARN }}
           role-session-name: supportflow-rollback-${{ github.run_id }}
 
+      - name: Capture currently deployed revisions and digest
+        id: previous-release
+        run: |
+          set -euo pipefail
+          API_CURRENT_ARN="$(aws ecs describe-services --cluster "$SUPPORTFLOW_ECS_CLUSTER" --services "$SUPPORTFLOW_ECS_API_SERVICE" --query 'services[0].taskDefinition' --output text)"
+          WORKER_CURRENT_ARN="$(aws ecs describe-services --cluster "$SUPPORTFLOW_ECS_CLUSTER" --services "$SUPPORTFLOW_ECS_WORKER_SERVICE" --query 'services[0].taskDefinition' --output text)"
+          test -n "$API_CURRENT_ARN" && test "$API_CURRENT_ARN" != "None"
+          test -n "$WORKER_CURRENT_ARN" && test "$WORKER_CURRENT_ARN" != "None"
+          API_CURRENT_REF="${API_CURRENT_ARN##*/}"
+          WORKER_CURRENT_REF="${WORKER_CURRENT_ARN##*/}"
+          aws ecs describe-task-definition --task-definition "$API_CURRENT_ARN" --query taskDefinition --output json > "$RUNNER_TEMP/current-api.json"
+          aws ecs describe-task-definition --task-definition "$WORKER_CURRENT_ARN" --query taskDefinition --output json > "$RUNNER_TEMP/current-worker.json"
+          API_DIGEST="$(python scripts/aws/release_contract.py extract-task-definition-digest "$RUNNER_TEMP/current-api.json" --container-name "$SUPPORTFLOW_ECS_API_CONTAINER_NAME")"
+          WORKER_DIGEST="$(python scripts/aws/release_contract.py extract-task-definition-digest "$RUNNER_TEMP/current-worker.json" --container-name "$SUPPORTFLOW_ECS_WORKER_CONTAINER_NAME")"
+          test "$API_DIGEST" = "$WORKER_DIGEST"
+          {
+            echo "api_task_definition=$API_CURRENT_REF"
+            echo "worker_task_definition=$WORKER_CURRENT_REF"
+            echo "image_digest=$API_DIGEST"
+          } >> "$GITHUB_OUTPUT"
+          echo "Captured current API/worker revisions and matching digest"
+
       - name: Validate previous task-definition families
         env:
           PREVIOUS_API_TASK_DEFINITION: ${{ inputs.previous_api_task_definition }}
           PREVIOUS_WORKER_TASK_DEFINITION: ${{ inputs.previous_worker_task_definition }}
+          PREVIOUS_RELEASE_IMAGE: ${{ inputs.previous_release_image }}
         run: |
           set -euo pipefail
-          API_FAMILY="$(aws ecs describe-task-definition --task-definition "$PREVIOUS_API_TASK_DEFINITION" --query 'taskDefinition.family' --output text)"
-          WORKER_FAMILY="$(aws ecs describe-task-definition --task-definition "$PREVIOUS_WORKER_TASK_DEFINITION" --query 'taskDefinition.family' --output text)"
+          aws ecs describe-task-definition --task-definition "$PREVIOUS_API_TASK_DEFINITION" --query taskDefinition --output json > "$RUNNER_TEMP/rollback-api.json"
+          aws ecs describe-task-definition --task-definition "$PREVIOUS_WORKER_TASK_DEFINITION" --query taskDefinition --output json > "$RUNNER_TEMP/rollback-worker.json"
+          API_FAMILY="$(python - "$RUNNER_TEMP/rollback-api.json" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding="utf-8"))["family"])
+          PY
+          )"
+          WORKER_FAMILY="$(python - "$RUNNER_TEMP/rollback-worker.json" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding="utf-8"))["family"])
+          PY
+          )"
           test "$API_FAMILY" = "$SUPPORTFLOW_ECS_API_TASK_FAMILY"
           test "$WORKER_FAMILY" = "$SUPPORTFLOW_ECS_WORKER_TASK_FAMILY"
+          python scripts/aws/release_contract.py assert-task-definition-digest \
+            "$RUNNER_TEMP/rollback-api.json" --image-uri "$PREVIOUS_RELEASE_IMAGE" \
+            --container-name "$SUPPORTFLOW_ECS_API_CONTAINER_NAME"
+          python scripts/aws/release_contract.py assert-task-definition-digest \
+            "$RUNNER_TEMP/rollback-worker.json" --image-uri "$PREVIOUS_RELEASE_IMAGE" \
+            --container-name "$SUPPORTFLOW_ECS_WORKER_CONTAINER_NAME"
+          echo "Rollback targets have expected families and one matching immutable digest"
 
       - name: Restore previous API and worker revisions
         env:
@@ -411,3 +554,49 @@ jobs:
           curl --fail --silent --show-error --retry 12 --retry-delay 5 --output /dev/null "$SUPPORTFLOW_ALB_BASE_URL/health/ready"
           python scripts/aws/smoke.py --base-url "$SUPPORTFLOW_ALB_BASE_URL"
           echo "Rollback restored compatible API and worker revisions; no database downgrade was attempted"
+
+      - name: Scan CloudWatch rollback logs without echoing them
+        run: |
+          set -euo pipefail
+          START_TIME="$(date -d '${{ steps.release-meta.outputs.release_started_at }}' +%s)000"
+          : > "$RUNNER_TEMP/rollback-service.log"
+          IFS=',' read -ra LOG_GROUPS <<< "$SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS"
+          for log_group in "${LOG_GROUPS[@]}"; do
+            aws logs filter-log-events --log-group-name "$log_group" --start-time "$START_TIME" \
+              --query 'events[].message' --output text >> "$RUNNER_TEMP/rollback-service.log"
+          done
+          python scripts/week3_sensitive_scan.py "$RUNNER_TEMP/rollback-service.log" \
+            --forbid "$SUPPORTFLOW_SMOKE_PASSWORD" \
+            --forbid "$SUPPORTFLOW_SMOKE_INITIAL_BODY" \
+            --forbid "$SUPPORTFLOW_SMOKE_FOLLOWUP_BODY"
+
+      - name: Write sanitized rollback evidence
+        env:
+          PREVIOUS_API_TASK_DEFINITION: ${{ steps.previous-release.outputs.api_task_definition }}
+          PREVIOUS_WORKER_TASK_DEFINITION: ${{ steps.previous-release.outputs.worker_task_definition }}
+          PREVIOUS_IMAGE_DIGEST: ${{ steps.previous-release.outputs.image_digest }}
+        run: |
+          python scripts/aws/release_contract.py write-evidence \
+            "$RUNNER_TEMP/release-evidence.json" \
+            --commit-sha "$GITHUB_SHA" \
+            --image-uri "$SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE" \
+            --environment "$SUPPORTFLOW_DEPLOY_ENVIRONMENT" \
+            --operation rollback \
+            --release-started-at "${{ steps.release-meta.outputs.release_started_at }}" \
+            --backup-reference "$SUPPORTFLOW_BACKUP_REFERENCE" \
+            --schema-compatibility-reference "$SUPPORTFLOW_SCHEMA_COMPATIBILITY_REFERENCE" \
+            --migration-revision "not-changed" \
+            --api-task-definition "${{ inputs.previous_api_task_definition }}" \
+            --worker-task-definition "${{ inputs.previous_worker_task_definition }}" \
+            --previous-api-task-definition "$PREVIOUS_API_TASK_DEFINITION" \
+            --previous-worker-task-definition "$PREVIOUS_WORKER_TASK_DEFINITION" \
+            --previous-image-digest "$PREVIOUS_IMAGE_DIGEST" \
+            --smoke-status rolled_back
+
+      - name: Upload sanitized rollback evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: supportflow-${{ inputs.environment }}-rollback-${{ github.sha }}
+          path: ${{ runner.temp }}/release-evidence.json
+          if-no-files-found: error
+          retention-days: 14

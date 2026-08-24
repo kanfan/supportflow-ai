@@ -16,6 +16,10 @@ environment. It accepts these operations:
 - `rollback`: restore two previously compatible API/worker task-definition
   revisions and rerun readiness/application smoke without a database downgrade.
 
+Every dispatch also requires a fresh `backup_reference` and a
+`schema_compatibility_reference`. Rollback additionally requires the previous
+API/worker revisions and one immutable `previous_release_image` digest.
+
 The workflow calls the existing CI workflow through `workflow_call`, so Ruff,
 formatting, Pyright, the PostgreSQL/Redis suite, migration round-trip, and
 Container smoke are required before any deployment job can start. Pull-request
@@ -38,13 +42,24 @@ validates all of these before requesting AWS credentials:
 | `SUPPORTFLOW_ECS_*_CONTAINER_NAME` | Application container names to replace |
 | `SUPPORTFLOW_ECS_SUBNET_IDS` / `SUPPORTFLOW_ECS_SECURITY_GROUP_IDS` | Private Fargate network |
 | `SUPPORTFLOW_ALB_BASE_URL` | HTTPS ALB origin |
-| `SUPPORTFLOW_CLOUDWATCH_LOG_GROUP` | Release-log scan target |
+| `SUPPORTFLOW_CLOUDWATCH_LOG_GROUPS` | Comma-separated API/worker/migration release-log groups |
 | `SUPPORTFLOW_MIGRATION_BACKUP_CONFIRMED` | Human/platform backup gate, exactly `true` |
+| `SUPPORTFLOW_ALLOWED_DEPLOY_REF` | Must be `refs/heads/main` |
+| `SUPPORTFLOW_OIDC_AUDIENCE` | Must be `sts.amazonaws.com` |
+| `SUPPORTFLOW_OIDC_SUBJECT` | Must be `repo:<owner>/<repo>:environment:<environment>` |
+| `SUPPORTFLOW_ENVIRONMENT_REVIEW_REQUIRED` | Protected environment approval gate, exactly `true` |
+| `SUPPORTFLOW_ENVIRONMENT_NO_SELF_REVIEW` | Prevents self-approval, exactly `true` |
 
 The role ARN is an identifier, not an access key. No `AWS_ACCESS_KEY_ID`,
 `AWS_SECRET_ACCESS_KEY`, database password, Redis URL, or secret value belongs
 in repository or GitHub variables. Application credentials are injected by the
 ECS task definition through Secrets Manager references supplied by #37.
+
+The OIDC trust policy supplied by #37 must require `aud=sts.amazonaws.com`,
+`sub=repo:<owner>/<repo>:environment:<environment>`, and the protected
+environment's deployment branch `refs/heads/main`. The environment must
+require an independent reviewer and disallow self-review. The preflight fails
+before OIDC if any of these handoff values are missing or inconsistent.
 
 The synthetic smoke account is supplied through protected environment secrets:
 `SUPPORTFLOW_SMOKE_ORGANIZATION_ID`, `SUPPORTFLOW_SMOKE_EMAIL`,
@@ -63,19 +78,25 @@ The synthetic smoke account is supplied through protected environment secrets:
    named application container image and strips AWS read-only registration
    fields. ClamD sidecar images and all other task settings remain unchanged.
 6. The migration task is registered and run with the private Fargate network.
-   A non-zero exit stops promotion; no service is updated. The normal rollback
-   path never runs `alembic downgrade`.
+   The run response must contain one task, and the task result resolves the
+   named migration container (not `containers[0]`) and requires
+   `EssentialContainerExited` plus exit code `0`. A non-zero exit stops
+   promotion; no service is updated. The normal rollback path never runs
+   `alembic downgrade`.
 7. API and worker task definitions are registered with the same digest, both
    services are updated, and ECS stability is required.
 8. ALB readiness and the synthetic authentication, ticket, follow-up message,
    document upload, and worker-ingestion smoke run against the deployed origin.
-9. Recent CloudWatch messages are scanned without echoing them. Known password
-   and message canaries are passed as forbidden values to the existing
-   sensitive-output scanner.
-10. Only an allowlisted evidence JSON is uploaded: commit SHA, image digest,
-    environment, migration revision, task-definition family/revisions, and
-    smoke status. It contains no registry URL, account secret, endpoint secret,
-    token, filename, body, or extracted text.
+9. The release start timestamp is recorded before the first AWS mutation.
+   Every configured API/worker/migration CloudWatch log group is scanned from
+   that timestamp through completion without echoing raw messages. Known
+   password and message canaries are passed as forbidden values to the
+   existing sensitive-output scanner.
+10. Only an allowlisted evidence JSON is uploaded: operation, commit SHA,
+    image digest, environment, release start, backup/schema references,
+    migration revision, current and previous task-definition family/revisions,
+    previous digest, and smoke status. It contains no registry URL, account
+    secret, endpoint secret, token, filename, body, or extracted text.
 
 ## Concurrency and rollback
 
@@ -90,10 +111,14 @@ interrupting the first. The future #40 destroy/teardown workflow must reuse the
 same group and protected environment. It must not run Terraform destroy while a
 release or rollback is active.
 
-Rollback requires explicit previous API and worker `family:revision` inputs.
-The workflow verifies each family before updating services, waits for stability,
-and reruns readiness/application smoke. It does not change the database schema;
-schema recovery remains the reviewed RDS restore/forward-fix procedure.
+Rollback requires explicit previous API and worker `family:revision` inputs,
+one matching immutable previous image digest, and the per-run schema
+compatibility reference. The workflow resolves each named application
+container, verifies both expected families and the same digest, captures the
+currently deployed revisions/digest, waits for stability, reruns
+readiness/application smoke, scans all release logs, and uploads sanitized
+rollback evidence. It does not change the database schema; schema recovery
+remains the reviewed RDS restore/forward-fix procedure.
 
 ## Evidence boundary
 
