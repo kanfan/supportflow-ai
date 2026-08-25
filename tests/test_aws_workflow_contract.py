@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -8,19 +9,19 @@ DEPLOY_WORKFLOW = ROOT / ".github" / "workflows" / "aws-deploy.yml"
 CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 
-def _workflow() -> dict[str, object]:
+def _workflow() -> dict[Any, Any]:
     parsed = yaml.safe_load(DEPLOY_WORKFLOW.read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
     return parsed
 
 
-def _jobs() -> dict[str, dict[str, object]]:
+def _jobs() -> dict[str, dict[str, Any]]:
     jobs = _workflow()["jobs"]
     assert isinstance(jobs, dict)
     return jobs
 
 
-def _steps(job: dict[str, object]) -> list[dict[str, object]]:
+def _steps(job: dict[str, Any]) -> list[dict[str, Any]]:
     steps = job.get("steps")
     assert isinstance(steps, list)
     return [step for step in steps if isinstance(step, dict)]
