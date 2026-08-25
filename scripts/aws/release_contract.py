@@ -418,6 +418,16 @@ def build_release_evidence(
         raise ReleaseContractError("unsupported deployment mode")
     if operation not in {"deploy", "rollback"}:
         raise ReleaseContractError("unsupported release operation")
+    if deployment_mode == "bootstrap" and operation != "deploy":
+        raise ReleaseContractError("bootstrap evidence can only describe deploy")
+    if operation == "deploy" and smoke_status != "passed":
+        raise ReleaseContractError("deploy evidence requires passed smoke status")
+    if operation == "rollback" and (
+        deployment_mode != "upgrade" or smoke_status != "rolled_back"
+    ):
+        raise ReleaseContractError(
+            "rollback evidence requires upgrade mode and rolled_back status"
+        )
     if ISO_UTC.fullmatch(release_started_at) is None:
         raise ReleaseContractError("release start must be an ISO UTC timestamp")
     _safe_reference(backup_reference, "backup_reference")

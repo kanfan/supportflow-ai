@@ -81,7 +81,8 @@ tasks; they are not a prior application release.
 
 For `deployment_mode=bootstrap`, the pipeline skips the current service
 revision/digest capture, renders the Terraform task shells with the new
-immutable image, runs migration, promotes API/worker, and records
+immutable image, runs migration, explicitly changes the API and worker
+service desired counts to `1/1`, promotes API/worker, and records
 `deployment_mode=bootstrap` plus `previous_* = none` in sanitized evidence.
 Rollback is not available for that run because no compatible previous release
 exists. A later `deployment_mode=upgrade` run captures and verifies the current

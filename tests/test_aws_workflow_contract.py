@@ -72,6 +72,7 @@ def test_deploy_steps_preserve_release_order_and_bootstrap_mode() -> None:
         "Configure AWS credentials through GitHub OIDC",
         "Build and push one commit-tagged image",
         "Run migration task before service promotion",
+        "Establish bootstrap API and worker desired count at 1/1",
         "Promote API and worker using the same release image",
         "Verify ALB readiness and run synthetic application smoke",
         "Scan CloudWatch release logs without echoing them",
@@ -79,6 +80,14 @@ def test_deploy_steps_preserve_release_order_and_bootstrap_mode() -> None:
     ]
     positions = [names.index(name) for name in ordered]
     assert positions == sorted(positions)
+
+    bootstrap = next(
+        step
+        for step in steps
+        if step.get("name") == "Establish bootstrap API and worker desired count at 1/1"
+    )
+    assert bootstrap["if"] == "inputs.deployment_mode == 'bootstrap'"
+    assert bootstrap["run"].count("--desired-count 1") == 2
 
     capture = next(step for step in steps if step.get("id") == "previous-release")
     assert capture["if"] == "inputs.deployment_mode == 'upgrade'"

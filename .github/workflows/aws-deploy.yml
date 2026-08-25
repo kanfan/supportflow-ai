@@ -381,6 +381,16 @@ jobs:
             --container-name "$SUPPORTFLOW_ECS_MIGRATION_CONTAINER_NAME"
           echo "Migration task completed successfully"
 
+      - name: Establish bootstrap API and worker desired count at 1/1
+        if: inputs.deployment_mode == 'bootstrap'
+        run: |
+          set -euo pipefail
+          aws ecs update-service --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
+            --service "$SUPPORTFLOW_ECS_API_SERVICE" --desired-count 1 >/dev/null
+          aws ecs update-service --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
+            --service "$SUPPORTFLOW_ECS_WORKER_SERVICE" --desired-count 1 >/dev/null
+          echo "Bootstrap service desired counts are explicitly API=1 and worker=1"
+
       - name: Promote API and worker using the same release image
         env:
           API_TASK_DEFINITION: ${{ steps.task-definitions.outputs.api }}

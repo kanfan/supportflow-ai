@@ -204,6 +204,50 @@ def test_bootstrap_evidence_records_absent_previous_release() -> None:
     assert evidence["previous_image_digest"] == "none"
 
 
+def test_release_evidence_rejects_inconsistent_mode_operation_and_status() -> None:
+    common = {
+        "commit_sha": "d" * 40,
+        "image_uri": IMAGE,
+        "environment": "staging",
+        "release_started_at": "2026-08-25T12:00:00Z",
+        "backup_reference": "backup:staging:2026-08-25",
+        "schema_compatibility_reference": "schema:0004_documents",
+        "migration_revision": "0004_documents",
+        "api_task_definition": "supportflow-api:1",
+        "worker_task_definition": "supportflow-worker:1",
+        "previous_api_task_definition": "none",
+        "previous_worker_task_definition": "none",
+        "previous_image_digest": "none",
+    }
+
+    with pytest.raises(ReleaseContractError, match="bootstrap evidence"):
+        build_release_evidence(
+            **common,
+            deployment_mode="bootstrap",
+            operation="rollback",
+            smoke_status="rolled_back",
+        )
+    with pytest.raises(ReleaseContractError, match="deploy evidence"):
+        build_release_evidence(
+            **common,
+            deployment_mode="bootstrap",
+            operation="deploy",
+            smoke_status="rolled_back",
+        )
+    with pytest.raises(ReleaseContractError, match="rollback evidence"):
+        build_release_evidence(
+            **{
+                **common,
+                "previous_api_task_definition": "supportflow-api:2",
+                "previous_worker_task_definition": "supportflow-worker:2",
+                "previous_image_digest": "sha256:" + "e" * 64,
+            },
+            deployment_mode="upgrade",
+            operation="rollback",
+            smoke_status="passed",
+        )
+
+
 def test_migration_result_uses_named_container_even_when_sidecar_is_first() -> None:
     from scripts.aws.release_contract import validate_migration_task_result
 
