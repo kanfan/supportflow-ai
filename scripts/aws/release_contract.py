@@ -34,6 +34,7 @@ class ReleaseContractError(ValueError):
 @dataclass(frozen=True)
 class ReleaseConfig:
     environment: str
+    deployment_mode: str
     aws_region: str
     oidc_role_arn: str
     ecr_repository: str
@@ -145,6 +146,13 @@ class ReleaseConfig:
         operation = values.get("SUPPORTFLOW_RELEASE_OPERATION", "deploy").strip()
         if operation not in {"deploy", "rollback"}:
             raise ReleaseContractError("SUPPORTFLOW_RELEASE_OPERATION is invalid")
+        deployment_mode = values.get("SUPPORTFLOW_DEPLOYMENT_MODE", "").strip()
+        if deployment_mode not in {"bootstrap", "upgrade"}:
+            raise ReleaseContractError(
+                "SUPPORTFLOW_DEPLOYMENT_MODE must be bootstrap or upgrade"
+            )
+        if operation == "rollback" and deployment_mode != "upgrade":
+            raise ReleaseContractError("rollback requires upgrade deployment mode")
         if operation == "rollback":
             validate_image_uri(required("SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE"))
 
@@ -155,6 +163,7 @@ class ReleaseConfig:
 
         return cls(
             environment=environment,
+            deployment_mode=deployment_mode,
             aws_region=required("AWS_REGION"),
             oidc_role_arn=role_arn,
             ecr_repository=required("SUPPORTFLOW_ECR_REPOSITORY").strip("/"),
@@ -385,6 +394,7 @@ def build_release_evidence(
     commit_sha: str,
     image_uri: str,
     environment: str,
+    deployment_mode: str,
     operation: str,
     release_started_at: str,
     backup_reference: str,
@@ -404,6 +414,8 @@ def build_release_evidence(
     _, digest = validate_image_uri(image_uri)
     if environment not in ALLOWED_ENVIRONMENTS:
         raise ReleaseContractError("unsupported evidence environment")
+    if deployment_mode not in {"bootstrap", "upgrade"}:
+        raise ReleaseContractError("unsupported deployment mode")
     if operation not in {"deploy", "rollback"}:
         raise ReleaseContractError("unsupported release operation")
     if ISO_UTC.fullmatch(release_started_at) is None:
@@ -418,8 +430,19 @@ def build_release_evidence(
         ("previous_worker_task_definition", previous_worker_task_definition),
     ):
         _safe_reference(value, name)
-    if SHA256_DIGEST.fullmatch(previous_image_digest) is None:
-        raise ReleaseContractError("previous_image_digest must be a sha256 digest")
+    if deployment_mode == "bootstrap":
+        if (
+            previous_image_digest != "none"
+            or previous_api_task_definition != "none"
+            or previous_worker_task_definition != "none"
+        ):
+            raise ReleaseContractError(
+                "bootstrap evidence must record absent previous release"
+            )
+    elif SHA256_DIGEST.fullmatch(previous_image_digest) is None:
+        raise ReleaseContractError(
+            "upgrade evidence must record a previous sha256 digest"
+        )
     if smoke_status not in {"passed", "rolled_back"}:
         raise ReleaseContractError("smoke status must be passed or rolled_back")
     return {
@@ -427,6 +450,7 @@ def build_release_evidence(
         "commit_sha": commit_sha,
         "image_digest": digest,
         "environment": environment,
+        "deployment_mode": deployment_mode,
         "operation": operation,
         "release_started_at": release_started_at,
         "backup_reference": backup_reference,
@@ -447,6 +471,7 @@ def write_release_evidence(path: Path, evidence: Mapping[str, str]) -> None:
         "commit_sha",
         "image_digest",
         "environment",
+        "deployment_mode",
         "operation",
         "release_started_at",
         "backup_reference",
@@ -500,6 +525,7 @@ def _parser() -> argparse.ArgumentParser:
     evidence.add_argument("--commit-sha", required=True)
     evidence.add_argument("--image-uri", required=True)
     evidence.add_argument("--environment", required=True)
+    evidence.add_argument("--deployment-mode", required=True)
     evidence.add_argument("--operation", required=True)
     evidence.add_argument("--release-started-at", required=True)
     evidence.add_argument("--backup-reference", required=True)
@@ -555,6 +581,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             commit_sha=args.commit_sha,
             image_uri=args.image_uri,
             environment=args.environment,
+            deployment_mode=args.deployment_mode,
             operation=args.operation,
             release_started_at=args.release_started_at,
             backup_reference=args.backup_reference,

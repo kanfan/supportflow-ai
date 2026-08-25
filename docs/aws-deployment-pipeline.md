@@ -19,6 +19,9 @@ environment. It accepts these operations:
 Every dispatch also requires a fresh `backup_reference` and a
 `schema_compatibility_reference`. Rollback additionally requires the previous
 API/worker revisions and one immutable `previous_release_image` digest.
+Deploys also select an explicit `deployment_mode`: `bootstrap` for the first
+release in a freshly applied Terraform environment, or `upgrade` when a
+previous release is already serving traffic.
 
 The workflow calls the existing CI workflow through `workflow_call`, so Ruff,
 formatting, Pyright, the PostgreSQL/Redis suite, migration round-trip, and
@@ -65,6 +68,25 @@ The synthetic smoke account is supplied through protected environment secrets:
 `SUPPORTFLOW_SMOKE_ORGANIZATION_ID`, `SUPPORTFLOW_SMOKE_EMAIL`,
 `SUPPORTFLOW_SMOKE_PASSWORD`, `SUPPORTFLOW_SMOKE_INITIAL_BODY`, and
 `SUPPORTFLOW_SMOKE_FOLLOWUP_BODY`. The smoke runner never prints these values.
+
+## Fresh Terraform bootstrap versus upgrade
+
+Terraform must provision the AWS shells before the first pipeline run: the
+ECR repository, ECS cluster, private subnets/security groups, CloudWatch log
+groups, ALB/listener and target group, and API/worker ECS services. It must
+also register API, worker, and migration task-definition families with the
+reviewed CPU/memory/network/logging/secrets contract and an approved sidecar
+layout. These shells may use a placeholder image and may have no running
+tasks; they are not a prior application release.
+
+For `deployment_mode=bootstrap`, the pipeline skips the current service
+revision/digest capture, renders the Terraform task shells with the new
+immutable image, runs migration, promotes API/worker, and records
+`deployment_mode=bootstrap` plus `previous_* = none` in sanitized evidence.
+Rollback is not available for that run because no compatible previous release
+exists. A later `deployment_mode=upgrade` run captures and verifies the current
+API/worker revisions and matching digest before promotion; only after that
+successful evidence exists can the rollback inputs be used.
 
 ## Immutable release sequence
 

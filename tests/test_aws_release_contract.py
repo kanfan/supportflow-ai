@@ -40,6 +40,7 @@ def deployment_environment() -> dict[str, str]:
         "GITHUB_REPOSITORY": "kanfan/supportflow-ai",
         "GITHUB_REF": "refs/heads/main",
         "SUPPORTFLOW_RELEASE_OPERATION": "deploy",
+        "SUPPORTFLOW_DEPLOYMENT_MODE": "upgrade",
         "SUPPORTFLOW_ALLOWED_DEPLOY_REF": "refs/heads/main",
         "SUPPORTFLOW_OIDC_AUDIENCE": "sts.amazonaws.com",
         "SUPPORTFLOW_OIDC_SUBJECT": "repo:kanfan/supportflow-ai:environment:staging",
@@ -74,6 +75,7 @@ def test_release_config_requires_backup_confirmation_and_validates_non_secret_in
     config = ReleaseConfig.from_env(deployment_environment())
 
     assert config.environment == "staging"
+    assert config.deployment_mode == "upgrade"
     assert config.subnet_ids == ("subnet-abc123", "subnet-def456")
     assert config.security_group_ids == ("sg-abc123",)
 
@@ -81,6 +83,16 @@ def test_release_config_requires_backup_confirmation_and_validates_non_secret_in
     invalid["SUPPORTFLOW_MIGRATION_BACKUP_CONFIRMED"] = "false"
     with pytest.raises(ReleaseContractError, match="BACKUP_CONFIRMED"):
         ReleaseConfig.from_env(invalid)
+
+
+def test_bootstrap_config_does_not_require_a_previous_release() -> None:
+    values = deployment_environment()
+    values["SUPPORTFLOW_DEPLOYMENT_MODE"] = "bootstrap"
+    values.pop("SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE", None)
+
+    config = ReleaseConfig.from_env(values)
+
+    assert config.deployment_mode == "bootstrap"
 
 
 @pytest.mark.parametrize(
@@ -145,6 +157,7 @@ def test_release_evidence_is_allowlisted_and_contains_digest_not_registry_url(
         commit_sha="b" * 40,
         image_uri=IMAGE,
         environment="staging",
+        deployment_mode="upgrade",
         operation="deploy",
         release_started_at="2026-08-24T12:00:00Z",
         backup_reference="backup:staging:2026-08-24T1200Z",
@@ -166,6 +179,29 @@ def test_release_evidence_is_allowlisted_and_contains_digest_not_registry_url(
     assert set(json.loads(serialized)) == set(evidence)
     with pytest.raises(ReleaseContractError, match="allowlisted"):
         write_release_evidence(output, {**evidence, "secret": "must-not-write"})
+
+
+def test_bootstrap_evidence_records_absent_previous_release() -> None:
+    evidence = build_release_evidence(
+        commit_sha="c" * 40,
+        image_uri=IMAGE,
+        environment="staging",
+        deployment_mode="bootstrap",
+        operation="deploy",
+        release_started_at="2026-08-25T12:00:00Z",
+        backup_reference="fresh-env:2026-08-25",
+        schema_compatibility_reference="schema:0004_documents",
+        migration_revision="0004_documents",
+        api_task_definition="supportflow-api:1",
+        worker_task_definition="supportflow-worker:1",
+        previous_api_task_definition="none",
+        previous_worker_task_definition="none",
+        previous_image_digest="none",
+        smoke_status="passed",
+    )
+
+    assert evidence["deployment_mode"] == "bootstrap"
+    assert evidence["previous_image_digest"] == "none"
 
 
 def test_migration_result_uses_named_container_even_when_sidecar_is_first() -> None:

@@ -11,6 +11,14 @@ on:
           - deploy
           - rollback
         default: deploy
+      deployment_mode:
+        description: Bootstrap a fresh Terraform environment or upgrade an existing release
+        required: true
+        type: choice
+        options:
+          - bootstrap
+          - upgrade
+        default: upgrade
       environment:
         description: Protected GitHub environment backed by the #37 handoff
         required: true
@@ -84,6 +92,7 @@ jobs:
       GITHUB_REPOSITORY: ${{ github.repository }}
       GITHUB_REF: ${{ github.ref }}
       SUPPORTFLOW_RELEASE_OPERATION: ${{ inputs.operation }}
+      SUPPORTFLOW_DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
       SUPPORTFLOW_ALLOWED_DEPLOY_REF: ${{ vars.SUPPORTFLOW_ALLOWED_DEPLOY_REF }}
       SUPPORTFLOW_OIDC_AUDIENCE: ${{ vars.SUPPORTFLOW_OIDC_AUDIENCE }}
       SUPPORTFLOW_OIDC_SUBJECT: ${{ vars.SUPPORTFLOW_OIDC_SUBJECT }}
@@ -116,6 +125,7 @@ jobs:
           test -n "$PREVIOUS_API_TASK_DEFINITION"
           test -n "$PREVIOUS_WORKER_TASK_DEFINITION"
           test -n "$SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE"
+          test "$SUPPORTFLOW_DEPLOYMENT_MODE" = "upgrade"
 
   deploy:
     name: Build, migrate, deploy, and smoke
@@ -131,6 +141,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_PAGER: ""
       SUPPORTFLOW_DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+      SUPPORTFLOW_DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
       SUPPORTFLOW_AWS_ROLE_ARN: ${{ vars.SUPPORTFLOW_AWS_ROLE_ARN }}
       SUPPORTFLOW_ECR_REPOSITORY: ${{ vars.SUPPORTFLOW_ECR_REPOSITORY }}
       SUPPORTFLOW_ECS_CLUSTER: ${{ vars.SUPPORTFLOW_ECS_CLUSTER }}
@@ -172,6 +183,7 @@ jobs:
 
       - name: Capture currently deployed revisions and digest
         id: previous-release
+        if: inputs.deployment_mode == 'upgrade'
         run: |
           set -euo pipefail
           aws ecs describe-services --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
@@ -414,9 +426,9 @@ jobs:
           IMAGE_URI: ${{ steps.image.outputs.image_uri }}
           API_TASK_DEFINITION: ${{ steps.task-definitions.outputs.api }}
           WORKER_TASK_DEFINITION: ${{ steps.task-definitions.outputs.worker }}
-          PREVIOUS_API_TASK_DEFINITION: ${{ steps.previous-release.outputs.api_task_definition }}
-          PREVIOUS_WORKER_TASK_DEFINITION: ${{ steps.previous-release.outputs.worker_task_definition }}
-          PREVIOUS_IMAGE_DIGEST: ${{ steps.previous-release.outputs.image_digest }}
+          PREVIOUS_API_TASK_DEFINITION: ${{ steps.previous-release.outputs.api_task_definition || 'none' }}
+          PREVIOUS_WORKER_TASK_DEFINITION: ${{ steps.previous-release.outputs.worker_task_definition || 'none' }}
+          PREVIOUS_IMAGE_DIGEST: ${{ steps.previous-release.outputs.image_digest || 'none' }}
           MIGRATION_REVISION: ${{ steps.migration.outputs.revision }}
         run: |
           python scripts/aws/release_contract.py write-evidence \
@@ -424,6 +436,7 @@ jobs:
             --commit-sha "$GITHUB_SHA" \
             --image-uri "$IMAGE_URI" \
             --environment "$SUPPORTFLOW_DEPLOY_ENVIRONMENT" \
+            --deployment-mode "$SUPPORTFLOW_DEPLOYMENT_MODE" \
             --operation deploy \
             --release-started-at "${{ steps.release-meta.outputs.release_started_at }}" \
             --backup-reference "$SUPPORTFLOW_BACKUP_REFERENCE" \
@@ -458,6 +471,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_PAGER: ""
       SUPPORTFLOW_DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+      SUPPORTFLOW_DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
       SUPPORTFLOW_AWS_ROLE_ARN: ${{ vars.SUPPORTFLOW_AWS_ROLE_ARN }}
       SUPPORTFLOW_ECS_CLUSTER: ${{ vars.SUPPORTFLOW_ECS_CLUSTER }}
       SUPPORTFLOW_ECS_API_SERVICE: ${{ vars.SUPPORTFLOW_ECS_API_SERVICE }}
@@ -581,6 +595,7 @@ jobs:
             --commit-sha "$GITHUB_SHA" \
             --image-uri "$SUPPORTFLOW_PREVIOUS_RELEASE_IMAGE" \
             --environment "$SUPPORTFLOW_DEPLOY_ENVIRONMENT" \
+            --deployment-mode "$SUPPORTFLOW_DEPLOYMENT_MODE" \
             --operation rollback \
             --release-started-at "${{ steps.release-meta.outputs.release_started_at }}" \
             --backup-reference "$SUPPORTFLOW_BACKUP_REFERENCE" \
