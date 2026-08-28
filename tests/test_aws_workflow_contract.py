@@ -74,6 +74,7 @@ def test_deploy_steps_preserve_release_order_and_bootstrap_mode() -> None:
         "Run migration task before service promotion",
         "Establish bootstrap API and worker desired count at 1/1",
         "Promote API and worker using the same release image",
+        "Wait for API and worker ECS stability",
         "Verify ALB readiness and run synthetic application smoke",
         "Scan CloudWatch release logs without echoing them",
         "Write sanitized release evidence",
@@ -88,6 +89,30 @@ def test_deploy_steps_preserve_release_order_and_bootstrap_mode() -> None:
     )
     assert bootstrap["if"] == "inputs.deployment_mode == 'bootstrap'"
     assert bootstrap["run"].count("--desired-count 1") == 2
+    assert bootstrap["env"] == {
+        "API_TASK_DEFINITION": "${{ steps.task-definitions.outputs.api }}",
+        "WORKER_TASK_DEFINITION": "${{ steps.task-definitions.outputs.worker }}",
+    }
+    assert (
+        '--service "$SUPPORTFLOW_ECS_API_SERVICE" \\'
+        + "\n"
+        + '  --task-definition "$API_TASK_DEFINITION" --desired-count 1'
+        in bootstrap["run"]
+    )
+    assert (
+        '--service "$SUPPORTFLOW_ECS_WORKER_SERVICE" \\'
+        + "\n"
+        + '  --task-definition "$WORKER_TASK_DEFINITION" --desired-count 1'
+        in bootstrap["run"]
+    )
+
+    promotion = next(
+        step
+        for step in steps
+        if step.get("name") == "Promote API and worker using the same release image"
+    )
+    assert promotion["if"] == "inputs.deployment_mode == 'upgrade'"
+    assert "--desired-count" not in promotion["run"]
 
     capture = next(step for step in steps if step.get("id") == "previous-release")
     assert capture["if"] == "inputs.deployment_mode == 'upgrade'"

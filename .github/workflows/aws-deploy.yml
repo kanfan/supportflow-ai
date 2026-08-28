@@ -383,15 +383,21 @@ jobs:
 
       - name: Establish bootstrap API and worker desired count at 1/1
         if: inputs.deployment_mode == 'bootstrap'
+        env:
+          API_TASK_DEFINITION: ${{ steps.task-definitions.outputs.api }}
+          WORKER_TASK_DEFINITION: ${{ steps.task-definitions.outputs.worker }}
         run: |
           set -euo pipefail
           aws ecs update-service --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
-            --service "$SUPPORTFLOW_ECS_API_SERVICE" --desired-count 1 >/dev/null
+            --service "$SUPPORTFLOW_ECS_API_SERVICE" \
+            --task-definition "$API_TASK_DEFINITION" --desired-count 1 >/dev/null
           aws ecs update-service --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
-            --service "$SUPPORTFLOW_ECS_WORKER_SERVICE" --desired-count 1 >/dev/null
-          echo "Bootstrap service desired counts are explicitly API=1 and worker=1"
+            --service "$SUPPORTFLOW_ECS_WORKER_SERVICE" \
+            --task-definition "$WORKER_TASK_DEFINITION" --desired-count 1 >/dev/null
+          echo "Bootstrap atomically applies release task definitions at API=1 and worker=1"
 
       - name: Promote API and worker using the same release image
+        if: inputs.deployment_mode == 'upgrade'
         env:
           API_TASK_DEFINITION: ${{ steps.task-definitions.outputs.api }}
           WORKER_TASK_DEFINITION: ${{ steps.task-definitions.outputs.worker }}
@@ -403,6 +409,11 @@ jobs:
           aws ecs update-service --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
             --service "$SUPPORTFLOW_ECS_WORKER_SERVICE" \
             --task-definition "$WORKER_TASK_DEFINITION" >/dev/null
+          echo "Upgrade preserves existing API and worker desired counts"
+
+      - name: Wait for API and worker ECS stability
+        run: |
+          set -euo pipefail
           aws ecs wait services-stable --cluster "$SUPPORTFLOW_ECS_CLUSTER" \
             --services "$SUPPORTFLOW_ECS_API_SERVICE" "$SUPPORTFLOW_ECS_WORKER_SERVICE"
           echo "API and worker services reached ECS stability"
