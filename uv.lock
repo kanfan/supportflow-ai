@@ -1546,6 +1546,7 @@ dependencies = [
 dev = [
     { name = "httpx" },
     { name = "pre-commit" },
+    { name = "pyyaml" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "reportlab" },
@@ -1572,6 +1573,7 @@ requires-dist = [
 dev = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "pyright", specifier = ">=1.1.411" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "reportlab", specifier = ">=4.4.9,<5" },
