@@ -85,8 +85,10 @@ immutable image, runs migration, then atomically applies each new API/worker
 task definition with its service desired count set to `1/1` in the same ECS
 `update-service` call. This prevents a placeholder task from starting before
 the release definition is attached. An `upgrade` updates task definitions only,
-preserving the existing service capacity, and records
-`deployment_mode=bootstrap` plus `previous_* = none` in sanitized evidence.
+preserving the existing service capacity. Bootstrap evidence records
+`deployment_mode=bootstrap` plus `previous_* = none`; upgrade evidence records
+`deployment_mode=upgrade` with the captured previous API/worker revisions and
+image digest.
 Rollback is not available for that run because no compatible previous release
 exists. A later `deployment_mode=upgrade` run captures and verifies the current
 API/worker revisions and matching digest before promotion; only after that
