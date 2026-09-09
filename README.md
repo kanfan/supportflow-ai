@@ -8,9 +8,10 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > organization context, admin/agent membership controls, tenant-scoped ticket
 > workflows, append-only audit events, the authenticated agent workspace, secure
 > document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
-> automated suite contains 281 tests and passes with PostgreSQL and Redis integration
-> enabled. Week 5 AWS infrastructure and pipeline code are in progress;
-> live deployment is currently deferred. AI classification and RAG remain follow-up
+> main CI run at `65275f9` recorded [297 passing tests](https://github.com/kanfan/supportflow-ai/actions/runs/34123283654)
+> with PostgreSQL and Redis integration enabled. Week 5 AWS infrastructure and
+> pipeline code are in progress; live deployment is currently deferred.
+> AI classification and RAG remain follow-up
 > milestones.
 
 ## The problem
@@ -158,6 +159,16 @@ live #40 verification remains pending. See the
 - [ ] Sanitized deployment evidence is retained and disposable AWS resources
       are destroyed within 24 hours after the planned verification window.
 
+Repository progress as of 2026-09-09:
+
+- [PR #51](https://github.com/kanfan/supportflow-ai/pull/51) merged the #39
+  deployment pipeline scaffold; live deployment evidence is still pending.
+- [Draft PR #53](https://github.com/kanfan/supportflow-ai/pull/53) adds the first
+  #37 Terraform state, budget, and OIDC foundation slice. It is under review;
+  no live AWS plan/apply or completed platform handoff is claimed.
+- [Draft PR #52](https://github.com/kanfan/supportflow-ai/pull/52) prepares #40's
+  verification checklist. Concrete live procedures await the reviewed #37 outputs.
+
 ## Week 5 ownership and handoff
 
 Ownership means leading and explaining a feature, not working alone.
@@ -176,7 +187,7 @@ protected by design: missing #37 environment outputs fail before OIDC is
 requested, and no live AWS deployment is claimed until #40 evidence exists.
 
 After ADR 0006 acceptance, #37 platform work, #38 local adapter/contract work,
-and #39 pipeline scaffolding can proceed in parallel. Persistent AWS apply waits
+and #39 pipeline scaffolding can proceed in parallel. Temporary AWS provisioning waits
 for the #37 account-safety, budget, state, reviewed-plan, and teardown gates;
 live integration waits for sanitized #37 outputs. Eray is the Week 5 Terraform
 Apply/Release Captain. Emir does not need AWS root, administrator, or long-lived
@@ -401,7 +412,8 @@ service. Staging and production reject plaintext Redis/Celery URLs and force
 certificate plus hostname verification for `rediss://` connections. Redis
 connection URLs are secret-valued settings so passwords are omitted from configuration
 representations. Live ElastiCache TLS and ECS task-replacement evidence remain
-part of #38/#40.
+part of the #37 platform handoff and #40 technical verification; #38's local
+application scope is complete.
 
 Database URLs are also secret-valued settings. Staging and production require
 the `postgresql+psycopg` driver, a database hostname, and an explicit
@@ -471,15 +483,16 @@ Use the `Location` returned by a successful `202 Accepted` response with
 verified `X-Organization-ID`; missing and cross-tenant identifiers return the
 same `404`.
 
-The scanner interface and fail-closed environment guard are present. The fake
-scanner is allowed only for local/test environments. The `external`
-configuration label alone is not sufficient: staging/production startup
-requires a concrete non-fake scanner adapter. The S3 adapter has deterministic
-SDK contract tests; live bucket/task-role evidence waits for the sanitized #37
-handoff. Worker-side extraction,
-retry/idempotency behavior, terminal audit atomicity, and status transitions are
-implemented on `main`; the production-like scanner adapter and live AWS
-integration remain Week 5 application work under #38.
+The concrete ClamD scanner adapter is implemented on `main` and selected with
+`SUPPORTFLOW_DOCUMENT_SCANNER_MODE=clamd`. It fails closed and requires the
+loopback address `127.0.0.1` outside local/test environments, matching the
+accepted worker-sidecar contract. The fake scanner is allowed only for
+local/test environments; the `external` configuration label alone is not a
+concrete adapter. The S3 adapter has deterministic SDK contract tests.
+Worker-side extraction, retry/idempotency behavior, terminal audit atomicity,
+and status transitions are also implemented. These complete #38's application
+scope; live scanner, bucket/task-role, and AWS integration evidence still require
+the #37 platform handoff and #40 verification.
 
 ### Database migrations
 
@@ -597,7 +610,10 @@ The plan is a roadmap, not an implementation claim. This README will evolve as w
 
 ## Data and privacy
 
-The portfolio environment will use synthetic or explicitly approved data. A real-data pilot will require a separate privacy review covering data minimization, retention, deletion, provider policies, access controls, and applicable KVKK obligations.
+The AWS portfolio environment uses synthetic data only, as required by
+ADR 0007. A future real-data pilot is outside this deployment scope and requires
+a separate decision and privacy review covering data minimization, retention,
+deletion, provider policies, access controls, and applicable KVKK obligations.
 
 ## Contributors
 
