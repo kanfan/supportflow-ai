@@ -1,4 +1,6 @@
 data "aws_iam_policy_document" "state_access" {
+  provider = aws.policy
+  for_each = toset(["plan", "apply"])
   statement {
     sid       = "ListFoundationState"
     effect    = "Allow"
@@ -16,12 +18,9 @@ data "aws_iam_policy_document" "state_access" {
   }
 
   statement {
-    sid    = "ReadWriteFoundationState"
-    effect = "Allow"
-    actions = [
-      "s3:GetObject",
-      "s3:PutObject",
-    ]
+    sid       = "AccessFoundationState"
+    effect    = "Allow"
+    actions   = each.key == "apply" ? ["s3:GetObject", "s3:PutObject"] : ["s3:GetObject"]
     resources = [local.state_file_arn]
   }
 
@@ -50,21 +49,22 @@ data "aws_iam_policy_document" "state_access" {
 }
 
 resource "aws_iam_policy" "state_access" {
-  name        = "${local.name_prefix}-terraform-state"
+  for_each    = toset(["plan", "apply"])
+  name        = "${local.name_prefix}-terraform-${each.key}-state"
   description = "Access only to the SupportFlow foundation state and native S3 lockfile"
-  policy      = data.aws_iam_policy_document.state_access.json
+  policy      = data.aws_iam_policy_document.state_access[each.key].json
 
   tags = local.mandatory_tags
 }
 
 resource "aws_iam_role_policy_attachment" "plan_state" {
   role       = aws_iam_role.terraform_plan.name
-  policy_arn = aws_iam_policy.state_access.arn
+  policy_arn = aws_iam_policy.state_access["plan"].arn
 }
 
 resource "aws_iam_role_policy_attachment" "apply_state" {
   role       = aws_iam_role.terraform_apply.name
-  policy_arn = aws_iam_policy.state_access.arn
+  policy_arn = aws_iam_policy.state_access["apply"].arn
 }
 
 resource "aws_iam_role_policy_attachment" "plan_read_only" {
@@ -78,6 +78,7 @@ resource "aws_iam_role_policy_attachment" "apply_read_only" {
 }
 
 data "aws_iam_policy_document" "deployment" {
+  provider = aws.policy
   statement {
     sid       = "AuthenticateToECR"
     effect    = "Allow"

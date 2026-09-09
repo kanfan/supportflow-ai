@@ -9,8 +9,8 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > workflows, append-only audit events, the authenticated agent workspace, secure
 > document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
 > automated suite contains 281 tests and passes with PostgreSQL and Redis integration
-> enabled. Week 5 AWS staging delivery is now in progress; no AWS staging
-> deployment is claimed yet. AI classification and RAG remain follow-up
+> enabled. Week 5 AWS infrastructure and pipeline code are in progress;
+> live deployment is currently deferred. AI classification and RAG remain follow-up
 > milestones.
 
 ## The problem
@@ -30,6 +30,13 @@ The first target users are small and medium-sized Turkish B2B SaaS support teams
 ## Why we are building it
 
 This project is being developed by Emir and Eray as a practical, end-to-end learning project after graduation. Both contributors will work across backend development, databases, asynchronous processing, AI/RAG, testing, security, observability, and deployment.
+
+The open-source portfolio goal is a system engineers can run, inspect, test,
+and explain. Current work prioritizes reproducible application behavior,
+reviewed architecture, regression tests, and measured synthetic evaluation.
+AWS remains part of the engineering scope through Terraform, application
+adapters, CI, and operational runbooks. Live AWS deployment is deferred;
+infrastructure code and offline tests are not deployment evidence.
 
 We will rotate feature ownership rather than permanently dividing the project into “backend” and “AI” roles. The goal is for both contributors to understand and explain the complete system.
 
@@ -105,13 +112,16 @@ complete platform decision and phased implementation plan are documented in
 [ADR 0004](./docs/adr/0004-aws-deployment-platform.md) and the
 [AWS deployment plan](./docs/aws-deployment-plan.md).
 
-## Current milestone: Week 5 AWS staging alpha
+## Current milestone: Week 5 AWS infrastructure and delivery code
 
 The current codebase proves the Week 1-4 application, security, ticket, audit,
 agent-workspace, document-upload, and reliable-ingestion foundations. Week 5
-moves that existing system toward a short-lived AWS staging alpha using the
+moves that existing system toward a reviewable AWS deployment path using the
 accepted ownership and handoff contract in
 [ADR 0006](./docs/adr/0006-week-5-aws-delivery-and-handoff.md).
+The live staging window is deferred; #37/#39 code work can continue while
+live #40 verification remains pending. See the
+[current portfolio scope](./docs/aws-deployment-plan.md#current-execution-scope).
 
 ### Completed baseline
 

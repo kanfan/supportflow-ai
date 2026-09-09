@@ -3,6 +3,22 @@
 This document turns ADR 0004 into a staged engineering plan. It defines the
 order and evidence; it does not claim that AWS infrastructure already exists.
 
+## Current execution scope
+
+As of 2026-09-09, live AWS deployment is deferred by the project owners.
+SupportFlow's immediate goal is an open-source engineering portfolio that can
+be run locally, reviewed, and explained with reproducible evidence. AWS remains
+in scope: continue Terraform, OIDC/pipeline code, storage/scanner/TLS adapters,
+offline contract tests, and operational documentation. No account creation,
+paid resources, live apply, or scheduled demo window is part of current work.
+
+Code review and CI can complete independently of the future live gates. Keep
+#37/#39 live handoff and #40 AWS verification explicitly pending; do not label
+them deployed or verified from mock tests. ADR 0007's cost and teardown rules
+still govern any future approved AWS window. Application features, AI/RAG
+evaluation on synthetic data, and a reproducible local demo remain portfolio
+deliverables even while deployment is deferred.
+
 ## Portfolio purpose and operating model
 
 SupportFlow is a portfolio and engineering-learning project. It is not being

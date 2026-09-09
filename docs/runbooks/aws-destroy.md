@@ -32,18 +32,33 @@ configuration, not an ad hoc force-destroy flag.
 
 ## Post-destroy verification
 
-Confirm Terraform reports no workload changes and inventory the approved region:
+Verify that the selected workload backend/key has no remaining state entries,
+then independently inventory the approved account and region. A normal plan
+against the unchanged configuration would propose recreating the resources;
+it is not a cleanup check.
 
 ```powershell
-terraform -chdir=infra/aws/workload plan -detailed-exitcode
+$remainingState = @(terraform -chdir=infra/aws/workload state list)
+if ($LASTEXITCODE -ne 0) { throw "Could not read workload state" }
+if ($remainingState.Count -ne 0) { throw "Workload state is not empty" }
 aws resourcegroupstaggingapi get-resources --region eu-central-1 `
   --tag-filters Key=Project,Values=supportflow Key=Environment,Values=staging
-aws ecs list-services --cluster supportflow-staging --region eu-central-1
+aws ecs describe-clusters --clusters supportflow-staging --region eu-central-1
 aws rds describe-db-instances --region eu-central-1
 aws elasticache describe-replication-groups --region eu-central-1
 ```
 
-The tag inventory must contain no disposable workload. Check ALB/NAT Gateway,
+For a destroyed ECS cluster, `describe-clusters` may return `MISSING` or a
+transient `INACTIVE` cluster; `list-services` may return `ClusterNotFoundException`.
+These are expected absence results only for the recorded cluster identifier.
+Access denied, wrong account/region, and network failures are not absence proof.
+An active cluster or surviving tasks/services require investigation.
+
+The tag inventory must contain no unexplained disposable workload. Retained
+bootstrap/foundation resources can appear and must match a recorded allowlist
+of exact identifiers. Inventory temporary RDS restore instances, recovery
+buckets/objects, and snapshots separately; an empty workload state does not
+prove recovery targets were removed. Check ALB/NAT Gateway,
 ECS tasks/services, RDS, ElastiCache, workload S3/ECR retention, CloudWatch log
 retention, snapshots, and Secrets Manager recovery windows explicitly because
 not every retained or recently deleted resource appears identically in the tag

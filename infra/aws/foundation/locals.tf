@@ -12,8 +12,7 @@ locals {
     Ephemeral          = "true"
   }
 
-  actual_budget_thresholds   = toset([10, 25, 50, 120])
-  forecast_budget_thresholds = toset([10, 25, 50, 120])
+  actual_budget_thresholds = toset([10, 25, 50, 120])
 
   state_bucket_name = trimprefix(var.state_bucket_arn, "arn:${data.aws_partition.current.partition}:s3:::")
   state_file_arn    = "${var.state_bucket_arn}/${var.foundation_state_key}"

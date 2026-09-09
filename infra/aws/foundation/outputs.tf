@@ -38,9 +38,9 @@ output "deployment_role_live_ready" {
   value       = length(var.ecs_pass_role_arns) > 0
 }
 
-output "monthly_budget_name" {
-  description = "Non-secret budget identifier for #40 evidence."
-  value       = aws_budgets_budget.portfolio_emergency.name
+output "monthly_budget_names" {
+  description = "Separate actual/forecast budget identifiers; each has four notifications."
+  value       = { for kind, budget in aws_budgets_budget.portfolio_emergency : kind => budget.name }
 }
 
 output "budget_thresholds_usd" {

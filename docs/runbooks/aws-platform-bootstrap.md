@@ -1,9 +1,12 @@
 # AWS platform bootstrap runbook
 
 This runbook creates only the retained Terraform state foundation, the monthly
-budget, and GitHub OIDC/IAM roles for Issue #37. It does not create VPC, ECS,
+budgets, and GitHub OIDC/IAM roles for Issue #37. It does not create VPC, ECS,
 RDS, ElastiCache, ALB, or document-storage workloads, and it is not evidence
 that SupportFlow has been deployed on AWS.
+
+Live deployment is currently deferred. These commands are a future operator
+procedure, not an instruction to apply as part of the current code review.
 
 ## Preconditions
 
@@ -70,7 +73,31 @@ verified; handle any local backup as sensitive material outside the repository.
 The state bucket and KMS key have `prevent_destroy` and remain after evidence
 workloads are removed.
 
-## 4. Plan and apply budget/OIDC/IAM foundation
+## 4. Verify the protected GitHub environment before creating OIDC roles
+
+Create or update the `staging` GitHub environment with:
+
+- deployment branch restricted to `main` (no wildcard or tag access);
+- Emir as required independent reviewer;
+- self-review disabled;
+- `SUPPORTFLOW_ALLOWED_DEPLOY_REF=refs/heads/main`;
+- `SUPPORTFLOW_OIDC_AUDIENCE=sts.amazonaws.com`;
+- `SUPPORTFLOW_OIDC_SUBJECT=repo:kanfan/supportflow-ai:environment:staging`;
+- `SUPPORTFLOW_ENVIRONMENT_REVIEW_REQUIRED=true`;
+- `SUPPORTFLOW_ENVIRONMENT_NO_SELF_REVIEW=true`.
+
+Verify the actual GitHub protection settings, not just these variable values:
+
+```powershell
+gh api repos/kanfan/supportflow-ai/environments/staging
+gh api repos/kanfan/supportflow-ai/environments/staging/deployment-branch-policies
+```
+
+Record the main-only branch rule, independent reviewer, and prevent-self-review
+setting before proceeding. Stop if any control is absent or cannot be verified.
+The OIDC environment subject alone does not restrict the originating branch.
+
+## 5. Plan and apply budget/OIDC/IAM foundation
 
 Copy and fill the ignored files with the bootstrap outputs and real notification
 emails:
@@ -94,11 +121,14 @@ the plan:
 terraform -chdir=infra/aws/foundation import aws_iam_openid_connect_provider.github "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com"
 ```
 
-The reviewed plan must show eight budget notifications: actual and forecast at
-USD 10, 25, 50, and 120. It must show three distinct OIDC roles and an exact
+The reviewed plan must show two budgets with four notifications each: actual
+and forecast at USD 10, 25, 50, and 120. Both monitor the same monthly account
+spend; the emergency ceiling remains USD 120, not USD 240. Each budget stays
+below AWS's five-notification limit. It must show three distinct OIDC roles and an exact
 `repo:kanfan/supportflow-ai:environment:staging` subject without wildcards.
 The Terraform apply role intentionally has read-only AWS discovery plus exact
-state/lock access in this slice; the workload PR must add reviewed, non-IAM
+state/lock access in this slice. Plan can read state and manage the lockfile;
+only apply can write the state object. The workload PR must add reviewed, non-IAM
 mutation permissions before it can be used for apply.
 After approval:
 
@@ -111,18 +141,7 @@ Each email subscriber must confirm the AWS Budgets subscription. Alerts can be
 delayed and are not a hard cap; the 24-hour workload teardown rule remains the
 primary cost control.
 
-## 5. Configure the protected GitHub environment
-
-Create or update the `staging` GitHub environment with:
-
-- deployment branch restricted to `main`;
-- Emir as required reviewer;
-- self-review disabled;
-- `SUPPORTFLOW_ALLOWED_DEPLOY_REF=refs/heads/main`;
-- `SUPPORTFLOW_OIDC_AUDIENCE=sts.amazonaws.com`;
-- `SUPPORTFLOW_OIDC_SUBJECT=repo:kanfan/supportflow-ai:environment:staging`;
-- `SUPPORTFLOW_ENVIRONMENT_REVIEW_REQUIRED=true`;
-- `SUPPORTFLOW_ENVIRONMENT_NO_SELF_REVIEW=true`.
+## 6. Future workload handoff
 
 Do not use the Terraform apply role or set `SUPPORTFLOW_AWS_ROLE_ARN` for a live
 release until the next workload slice supplies reviewed mutation permissions
@@ -132,7 +151,7 @@ outputs as `true`.
 ## Retained evidence
 
 Record only the exact commit, Terraform/provider versions, sanitized plan
-summary, account ID, region, state bucket/KMS ARNs, budget name/thresholds,
+summary, account ID, region, state bucket/KMS ARNs, both budget names/thresholds,
 role ARNs, OIDC subject, subscription-confirmation result, and known manual
 prerequisites. Never retain state content, plan files, email addresses, account
 credentials, or secret values in GitHub.
