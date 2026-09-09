@@ -1,0 +1,6 @@
+aws_region  = "eu-central-1"
+project_name = "supportflow"
+owner        = "Eray"
+cost_center  = "portfolio"
+
+state_version_retention_days = 90

@@ -141,6 +141,7 @@ accepted ownership and handoff contract in
 
 - [x] ADR 0006 defines the AWS ownership, credential, apply, handoff, and dependency boundaries.
 - [ ] #37 provisions the reviewed AWS platform foundation and publishes sanitized outputs and runbooks.
+- [ ] #37's first Terraform slice bootstraps retained remote state, account-wide budget alerts, and scoped GitHub OIDC/IAM roles; no live apply is claimed yet.
 - [x] #38 supplies the S3/scanner/session/readiness application adapters.
 - [ ] #39 deploys one immutable image digest through scoped GitHub OIDC.
 - [ ] #40 records integrated staging, rollback, recovery, security, cost, and teardown evidence.
@@ -573,6 +574,10 @@ the expected revision and recovery commit.
 - [ADR 0007: Ephemeral AWS portfolio-evidence environment](./docs/adr/0007-ephemeral-aws-portfolio-evidence.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
 - [Week 5 AWS application handoff contract](./docs/aws-application-handoff-contract.md)
+- [AWS platform bootstrap runbook](./docs/runbooks/aws-platform-bootstrap.md)
+- [AWS evidence deployment runbook](./docs/runbooks/aws-evidence-deploy.md)
+- [AWS restore runbook](./docs/runbooks/aws-restore.md)
+- [AWS teardown runbook](./docs/runbooks/aws-destroy.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 - [Week 3 threat model](./docs/security/week-3-threat-model.md)
 - [Week 3 release verification](./docs/reviews/week-3-verification.md)

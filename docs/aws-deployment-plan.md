@@ -104,7 +104,7 @@ the complete handoff.
 ## Phase 1: Terraform foundation
 
 - [ ] Add remote-state design without committing state or secrets.
-- [ ] Create separate staging and production-demo state.
+- [ ] Create retained bootstrap/foundation state and one disposable staging workload state; ADR 0007 does not keep a separate production-demo environment.
 - [ ] Provision VPC, public ALB/NAT subnets, private application subnets, and
       isolated data subnets across at least two Availability Zones.
 - [ ] Set `assign_public_ip = false` on ECS tasks and route each private
