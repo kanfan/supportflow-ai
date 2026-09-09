@@ -191,20 +191,30 @@ outputs, evidence, and runbooks.
 4. **AI classification:** provider adapter, structured output, validation, and evaluation fixtures.
 5. **RAG:** chunking, embeddings, tenant-filtered retrieval, citations, and no-answer behavior.
 6. **Human approval:** approve, edit, reject, feedback, and audit events.
-7. **Production-like quality:** observability, security testing, deployment, evaluation, and portfolio documentation.
+7. **Reliability showcase (planned):** transactional outbox, Kafka events, idempotent consumers, quarantine/DLQ and replay.
+8. **Measured operations (planned):** OpenTelemetry tracing, Prometheus/Grafana, structured logs, lab SLOs and k6 evidence.
+
+The [current roadmap addendum](./docs/distributed-reliability-plan.md) defines
+the gated sequence and measurement criteria; [ADR 0008](./docs/adr/0008-distributed-reliability-showcase.md)
+is proposed for joint review. Start by closing the existing dispatch crash
+window; retain the AI/RAG and human-review milestones. Live AWS deployment is
+currently deferred while infrastructure and pipeline code remain in scope.
 
 ## Scope boundaries
 
 The first release will not include:
 
 - automatic customer replies;
-- microservices, Kubernetes, Kafka, or a separate event bus;
+- microservice extraction or Kubernetes;
 - fine-tuning or custom model training;
 - complete Zendesk, email, WhatsApp, or call-center integrations;
 - billing and subscription management; or
 - a complex frontend application.
 
 These boundaries keep the project focused on its main learning and product goals.
+
+Kafka is a planned optional reliability profile under ADR 0008, not a current
+runtime dependency. Throughput, latency and recovery claims await measurements.
 
 ## Local development
 
@@ -576,6 +586,8 @@ The script validates the source page count, metadata title, and first-page
 revision marker before redaction. A mismatch raises a `ValueError` that names
 the expected revision and recovery commit.
 
+- [Current roadmap addendum: distributed reliability](./docs/distributed-reliability-plan.md) (supersedes the PDF schedule for this extension; planned work)
+- [ADR 0008: Distributed reliability showcase](./docs/adr/0008-distributed-reliability-showcase.md) (Proposed)
 - [API conventions](./docs/api-conventions.md)
 - [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
 - [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)
