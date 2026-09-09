@@ -85,3 +85,15 @@ def test_oidc_and_iam_foundation_stays_exact_and_fail_closed() -> None:
     assert "AdministratorAccess" not in iam_hcl
     assert "iam:PassRole" in iam_hcl
     assert 'values   = ["ecs-tasks.amazonaws.com"]' in iam_hcl
+
+
+def test_terraform_provider_locks_cover_windows_and_linux() -> None:
+    bootstrap_lock = (
+        ROOT / "infra" / "aws" / "bootstrap" / ".terraform.lock.hcl"
+    ).read_text(encoding="utf-8")
+    foundation_lock = (
+        ROOT / "infra" / "aws" / "foundation" / ".terraform.lock.hcl"
+    ).read_text(encoding="utf-8")
+
+    assert bootstrap_lock == foundation_lock
+    assert bootstrap_lock.count('"h1:') >= 2
