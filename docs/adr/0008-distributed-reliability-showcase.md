@@ -16,7 +16,8 @@ should demonstrate useful reliability properties with reproducible evidence.
 Adopt the [distributed reliability plan](../distributed-reliability-plan.md):
 
 1. Close durable ingestion dispatch with a PostgreSQL transactional outbox
-   and a Celery relay before introducing another broker.
+   and a normal-Compose Celery relay before introducing another broker.
+   Apply the [R1 lifecycle/recovery/retention contract](../r1-durable-dispatch-contract.md).
 2. Add an optional Apache Kafka/KRaft lab for versioned ticket-status events
    and a rebuildable tenant-scoped projection, with a transactional inbox,
    durable quarantine/DLQ and controlled replay.
@@ -49,3 +50,11 @@ to resource, client-compatibility and license review, not a second requirement.
 
 Accept after both contributors agree on R1 API semantics, the projection use
 case, replay/retention boundaries, ownership and the updated milestone order.
+
+R1 is independently shippable with its own evidence. Publication is not
+processing completion; lost-task reconciliation preserves worker ownership.
+R2 rebuild requires a complete ticket snapshot with a coordinated offset
+boundary plus later creation/status events, including never-transitioned tickets.
+After R1, explicitly select Kafka R2 or the original AI/RAG milestone, record
+new estimates and jointly accepted ownership. R2-R4 remain proposed; R1
+approval alone does not commit either contributor to the full extension.

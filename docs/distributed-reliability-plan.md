@@ -1,6 +1,6 @@
 # Distributed reliability and observability plan
 
-Date: 2026-09-09. Status: planned; architecture awaits joint review in ADR 0008.
+Updated: 2026-09-12. Status: planned; architecture awaits joint review in ADR 0008.
 Reading time: approximately 8 minutes. No new runtime capability is claimed.
 
 ## Purpose and precedence
@@ -29,15 +29,19 @@ together. Single-node persistence/restarts do not prove broker HA or quorum
 failure tolerance.
 
 First fix durable ingestion dispatch using an outbox destination for Celery.
-Then add a distinct `ticket.status_changed.v1` event for a rebuildable
+If R2 is selected after the R1 review, add `ticket.created.v1` and
+`ticket.status_changed.v1` events plus a baseline snapshot for a rebuildable
 tenant-scoped ticket-status projection in PostgreSQL. The projection is an
 eventual read model for demonstration/diagnostics, not authorization state or
 the source used for ticket mutations. No remote LLM calls or customer messages
 are replayed. This gives Kafka a real replay use case without duplicating the
 existing worker's job.
 
-The core Docker Compose path stays small. A `reliability` profile adds Kafka,
-relay and consumer; an `observability` profile adds OpenTelemetry Collector,
+The normal Compose path includes the Celery outbox relay; it starts without
+Kafka and is required for durable uploads. Its lifecycle, processing recovery
+and rollout are defined in the [R1 contract](./r1-durable-dispatch-contract.md).
+A `reliability` profile adds only Kafka and its relay/consumer; an
+`observability` profile adds OpenTelemetry Collector,
 Tempo, Prometheus and Grafana. Record CPU/RAM limits and actual usage. Bring up
 these profiles only during development or evidence runs. Kubernetes, EKS,
 microservice extraction, CDC/Debezium and a schema-registry service are outside
@@ -51,14 +55,19 @@ do not silently claim the original Week 12 deadline still fits expanded scope.
 
 | Package | Proposed lead / reviewer | Deliverable and exit gate |
 | --- | --- | --- |
-| R1: durable dispatch | Eray / Emir | Outbox migration, upload transaction and Celery relay; real post-commit crash recovery without a lost accepted job |
+| R1: durable dispatch | Eray / Emir (bounded approval required) | Independently shippable outbox, normal-path relay and recovery evidence within the stated Redis/worker assumptions |
 | R2: event processing | Emir / Eray | Kafka status events, transactional inbox/projection, retry and quarantine/replay; duplicate/order/tenant tests |
 | R3: telemetry | Eray / Emir | Correlated traces, bounded metrics, structured logs and dashboards across API/relay/consumer/worker |
 | R4: evidence | Shared; Emir reviews | k6 scripts, crash/replay harness, SLI reports and a reproducible short local demo |
 
-Both contributors must confirm these proposed assignments during ADR review.
-R2 depends on R1's outbox contract. R3 instrumentation can accompany R1/R2;
-R4 depends on their stable behavior. Keep each implementation PR bounded.
+R1 includes its own crash/recovery evidence and minimal health/backlog signals;
+it does not wait for R2-R4. After R1, both contributors record its results,
+capacity/time estimate and an explicit choice: Kafka R2 or the original
+classification/RAG milestone next. Record lead/reviewer and revised dates for
+that selected package in a GitHub issue before starting it. No decision means
+R2-R4 stay deferred, not an automatic queue ahead of product work.
+R2/R3/R4 assignments remain proposals; accepting R1 does not accept them.
+R2 depends on R1's contract; full R4 depends on the selected stable components.
 Continue classification, tenant-filtered RAG, citations/no-answer evaluation
 and human approval from the original roadmap; reliability work does not close
 or replace these product milestones. #37/#39 code review continues separately;
@@ -82,7 +91,8 @@ Celery versus Kafka; API code does not publish directly after commit.
 
 The relay claims bounded batches using DB locking and expiring leases, then
 publishes outside long-running DB transactions. A lease token fences stale
-relay updates. Mark delivered only after broker acknowledgement. A crash after
+relay updates. Mark `published` only after broker acknowledgement; this is
+not `processed`. The R1 contract defines lost-task reconciliation. A crash after
 acknowledgement can publish twice: delivery is at least once. Track attempts,
 next attempt, safe failure category and oldest pending age. Stop/retry on
 broker outages without discarding durable rows. Set bounded batch size,
@@ -117,9 +127,29 @@ Provide a rate-limited operator replay command with dry-run, explicit tenant,
 bounded event selection, schema validation and replay audit. Preserve original
 event IDs and use the same idempotent handler. No blanket inbox deletion or
 offset reset. For a full projection rebuild, use a new projection generation
-and consumer namespace, replay retained valid events, compare canonical
+and consumer namespace with the snapshot boundary below. Compare canonical
 per-tenant state hashes, then promote the generation after validation. A
 duplicate replay into the existing generation should be a no-op.
+
+### Rebuild baseline and completeness
+
+The initial local implementation uses a brief write barrier, not a timestamp
+guess: pause ticket writes and await in-flight transactions, drain the ticket
+outbox to broker acknowledgement, then record Kafka end offsets per partition
+and snapshot all tickets as `(tenant_id, ticket_id, status, aggregate_version)`
+under the same barrier. Include tickets that have never changed status. Store
+the snapshot checksum, schema version and offset vector together, then resume
+writes. New tickets emit creation events; transitions emit full current status
+with a monotonically increasing version. Snapshot and boundary capture failure
+aborts the rebuild; do not promote a partial baseline.
+
+Seed the new generation from that snapshot and consume from the recorded next
+offsets; duplicate or older versions cannot overwrite newer state. At a second
+write/drain barrier, catch up to its offset vector and compare sorted canonical
+tuples, counts and hashes per tenant with the authoritative DB at that barrier.
+Only then promote. Keep ticket deletion out of scope until tombstone events
+exist. If any required offset expired, obtain a fresh snapshot; retained status
+events alone cannot prove completeness or recreate never-transitioned tickets.
 
 Record replay coverage and retention: initial local target is seven days of
 Kafka data and at least that long for inbox deduplication records, plus a
