@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -200,3 +201,31 @@ class DocumentVersion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     document: Mapped[Document] = relationship(back_populates="versions")
+
+
+class DocumentIngestionIntent(UUIDPrimaryKeyMixin, Base):
+    """Durable Celery intent identity; relay lifecycle is added in the next slice."""
+
+    __tablename__ = "document_ingestion_outbox"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "document_version_id"],
+            ["document_versions.organization_id", "document_versions.id"],
+            name="fk_ingestion_outbox_tenant_version",
+        ),
+        UniqueConstraint(
+            "organization_id", "document_version_id", name="uq_ingestion_outbox_version"
+        ),
+        UniqueConstraint("task_id", name="uq_ingestion_outbox_task_id"),
+        CheckConstraint(
+            "task_id = trim(task_id) AND task_id <> ''", name="task_id_nonempty"
+        ),
+    )
+
+    organization_id: Mapped[UUID] = mapped_column(nullable=False)
+    document_version_id: Mapped[UUID] = mapped_column(nullable=False)
+    # Keep legacy Celery IDs verbatim, not only UUID-shaped IDs. New IDs are UUIDs.
+    task_id: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
