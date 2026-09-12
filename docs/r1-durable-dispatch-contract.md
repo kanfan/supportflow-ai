@@ -1,7 +1,10 @@
-# R1 durable dispatch contract (Proposed)
+# R1 durable dispatch contract (Accepted; implementation pending)
 
 Updated: 2026-09-12. Companion to the [roadmap](./distributed-reliability-plan.md).
 Approximately 5 minutes. This specifies future behavior, not implemented claims.
+Accepted for R1 only through Emir's PR #55 review at `725aca6` on 2026-09-12.
+[Issue #56](https://github.com/kanfan/supportflow-ai/issues/56) tracks delivery:
+Eray implements, Emir reviews. Later Kafka/observability packages remain proposed.
 
 ## Runtime and lifecycle
 

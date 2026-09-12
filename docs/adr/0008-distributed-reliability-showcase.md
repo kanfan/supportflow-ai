@@ -1,6 +1,6 @@
 # ADR 0008: Distributed reliability portfolio extension
 
-- Status: Proposed (Eray-approved direction; joint review pending)
+- Status: Accepted for R1 only; R2-R4 remain Proposed
 - Date: 2026-09-09
 - Scope: roadmap decision only; no runtime dependencies added
 
@@ -11,7 +11,7 @@ worker crash recovery. ADR 0005 documents a remaining DB-commit-to-dispatch
 crash window. Live AWS deployment is deferred. The next portfolio investment
 should demonstrate useful reliability properties with reproducible evidence.
 
-## Decision proposed for joint review
+## Decision (R1 accepted; later packages proposed)
 
 Adopt the [distributed reliability plan](../distributed-reliability-plan.md):
 
@@ -48,8 +48,13 @@ profile is too heavy, retain R1 and telemetry first; reconsider the broker in
 review without replacing the whole stack. Redpanda is an alternative subject
 to resource, client-compatibility and license review, not a second requirement.
 
-Accept after both contributors agree on R1 API semantics, the projection use
-case, replay/retention boundaries, ownership and the updated milestone order.
+On 2026-09-12 Emir approved PR #55 at `725aca6` for bounded R1 only.
+Eray implements and Emir reviews transaction boundaries, rollout and recovery
+evidence under [Issue #56](https://github.com/kanfan/supportflow-ai/issues/56).
+This accepts the R1 contract, not its implementation or completion. Deliver
+schema/transaction foundations first without changing upload behavior, then
+upload/relay/reconciliation integration and recovery evidence. R2-R4 require
+a separate joint milestone, estimate and ownership decision after R1.
 
 R1 is independently shippable with its own evidence. Publication is not
 processing completion; lost-task reconciliation preserves worker ownership.

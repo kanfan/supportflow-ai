@@ -1,6 +1,6 @@
 # Distributed reliability and observability plan
 
-Updated: 2026-09-12. Status: planned; architecture awaits joint review in ADR 0008.
+Updated: 2026-09-12. Status: R1 accepted in ADR 0008; R2-R4 remain proposed.
 Reading time: approximately 8 minutes. No new runtime capability is claimed.
 
 ## Purpose and precedence
