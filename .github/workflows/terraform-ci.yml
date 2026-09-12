@@ -1,0 +1,60 @@
+name: Terraform CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/aws/**"
+      - "docs/runbooks/aws-*.md"
+      - ".github/workflows/terraform-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/aws/**"
+      - "docs/runbooks/aws-*.md"
+      - ".github/workflows/terraform-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Terraform ${{ matrix.stack }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [bootstrap, foundation]
+
+    defaults:
+      run:
+        working-directory: infra/aws/${{ matrix.stack }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting
+        working-directory: .
+        run: terraform fmt -check -recursive infra/aws
+
+      - name: Initialize providers without a live backend
+        run: terraform init -backend=false -input=false -lockfile=readonly
+
+      - name: Validate configuration
+        run: terraform validate
+
+      - name: Run mocked Terraform contract tests
+        run: terraform test
