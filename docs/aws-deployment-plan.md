@@ -3,6 +3,10 @@
 This document turns ADR 0004 into a staged engineering plan. It defines the
 order and evidence; it does not claim that AWS infrastructure already exists.
 
+The [distributed reliability roadmap addendum](./distributed-reliability-plan.md)
+records the current local portfolio extension and defers live AWS execution.
+Kafka and telemetry lab work does not add MSK, Kubernetes or paid services to
+this AWS topology. The live gates below remain future verification work.
 ## Current execution scope
 
 As of 2026-09-09, live AWS deployment is deferred by the project owners.
