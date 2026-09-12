@@ -1,0 +1,22 @@
+aws_region    = "eu-central-1"
+project_name  = "supportflow"
+environment   = "staging"
+owner         = "Eray"
+cost_center   = "portfolio"
+
+# Use real addresses only in the ignored terraform.tfvars file. AWS requires
+# each subscriber to confirm the notification subscription.
+budget_notification_emails = [
+  "eray@example.invalid",
+  "emir@example.invalid",
+]
+
+monthly_emergency_budget_usd = 120
+github_repository            = "kanfan/supportflow-ai"
+
+state_bucket_arn  = "arn:aws:s3:::supportflow-123456789012-eu-central-1-tfstate"
+state_kms_key_arn = "arn:aws:kms:eu-central-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+
+# Kept empty in this foundation-only slice. The reviewed workload slice adds
+# exact ECS execution/task role ARNs before the deployment role is live-ready.
+ecs_pass_role_arns = []

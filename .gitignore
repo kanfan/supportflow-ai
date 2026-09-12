@@ -38,6 +38,21 @@ output/
 celerybeat-schedule*
 .supportflow/
 
+# Terraform local state, plans, credentials, and generated backend files
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+**/backend.hcl
+**/backend_override.tf
+**/terraform.tfvars
+
 # Codex and local intermediate files
 .agents/
 .codex/

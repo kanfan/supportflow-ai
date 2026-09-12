@@ -9,9 +9,9 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > workflows, append-only audit events, the authenticated agent workspace, secure
 > document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
 > main CI run at `65275f9` recorded [297 passing tests](https://github.com/kanfan/supportflow-ai/actions/runs/34123283654)
-> with PostgreSQL and Redis integration enabled. Week 5 AWS staging delivery is
-> in progress; no AWS staging
-> deployment is claimed yet. AI classification and RAG remain follow-up
+> with PostgreSQL and Redis integration enabled. Week 5 AWS infrastructure and
+> pipeline code are in progress; live deployment is currently deferred.
+> AI classification and RAG remain follow-up
 > milestones.
 
 ## The problem
@@ -31,6 +31,13 @@ The first target users are small and medium-sized Turkish B2B SaaS support teams
 ## Why we are building it
 
 This project is being developed by Emir and Eray as a practical, end-to-end learning project after graduation. Both contributors will work across backend development, databases, asynchronous processing, AI/RAG, testing, security, observability, and deployment.
+
+The open-source portfolio goal is a system engineers can run, inspect, test,
+and explain. Current work prioritizes reproducible application behavior,
+reviewed architecture, regression tests, and measured synthetic evaluation.
+AWS remains part of the engineering scope through Terraform, application
+adapters, CI, and operational runbooks. Live AWS deployment is deferred;
+infrastructure code and offline tests are not deployment evidence.
 
 We will rotate feature ownership rather than permanently dividing the project into “backend” and “AI” roles. The goal is for both contributors to understand and explain the complete system.
 
@@ -106,13 +113,16 @@ complete platform decision and phased implementation plan are documented in
 [ADR 0004](./docs/adr/0004-aws-deployment-platform.md) and the
 [AWS deployment plan](./docs/aws-deployment-plan.md).
 
-## Current milestone: Week 5 AWS staging alpha
+## Current milestone: Week 5 AWS infrastructure and delivery code
 
 The current codebase proves the Week 1-4 application, security, ticket, audit,
 agent-workspace, document-upload, and reliable-ingestion foundations. Week 5
-moves that existing system toward a short-lived AWS staging alpha using the
+moves that existing system toward a reviewable AWS deployment path using the
 accepted ownership and handoff contract in
 [ADR 0006](./docs/adr/0006-week-5-aws-delivery-and-handoff.md).
+The live staging window is deferred; #37/#39 code work can continue while
+live #40 verification remains pending. See the
+[current portfolio scope](./docs/aws-deployment-plan.md#current-execution-scope).
 
 ### Completed baseline
 
@@ -142,6 +152,7 @@ accepted ownership and handoff contract in
 
 - [x] ADR 0006 defines the AWS ownership, credential, apply, handoff, and dependency boundaries.
 - [ ] #37 provisions the reviewed AWS platform foundation and publishes sanitized outputs and runbooks.
+- [ ] #37's first Terraform slice bootstraps retained remote state, account-wide budget alerts, and scoped GitHub OIDC/IAM roles; no live apply is claimed yet.
 - [x] #38 supplies the S3/scanner/session/readiness application adapters.
 - [ ] #39 deploys one immutable image digest through scoped GitHub OIDC.
 - [ ] #40 records integrated staging, rollback, recovery, security, cost, and teardown evidence.
@@ -586,6 +597,10 @@ the expected revision and recovery commit.
 - [ADR 0007: Ephemeral AWS portfolio-evidence environment](./docs/adr/0007-ephemeral-aws-portfolio-evidence.md)
 - [AWS deployment plan](./docs/aws-deployment-plan.md)
 - [Week 5 AWS application handoff contract](./docs/aws-application-handoff-contract.md)
+- [AWS platform bootstrap runbook](./docs/runbooks/aws-platform-bootstrap.md)
+- [AWS evidence deployment runbook](./docs/runbooks/aws-evidence-deploy.md)
+- [AWS restore runbook](./docs/runbooks/aws-restore.md)
+- [AWS teardown runbook](./docs/runbooks/aws-destroy.md)
 - [Week 3 ticket workflow review](./docs/reviews/week-3-ticket-workflow-and-ui.md)
 - [Week 3 threat model](./docs/security/week-3-threat-model.md)
 - [Week 3 release verification](./docs/reviews/week-3-verification.md)
