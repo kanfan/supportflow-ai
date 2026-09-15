@@ -237,6 +237,9 @@ class DocumentIngestionService:
                     if version.attempt_count >= self._max_attempts:
                         version.status = DocumentProcessingStatus.FAILED
                         version.error_code = DocumentErrorCode.RETRY_EXHAUSTED.value
+                        version.processing_task_id = None
+                        version.processing_started_at = None
+                        version.extracted_text = None
                         AuditEventService(
                             session, version.organization_id
                         ).record_document_failed(

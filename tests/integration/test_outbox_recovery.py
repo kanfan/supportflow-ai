@@ -206,6 +206,51 @@ def test_ambiguous_extracting_owner_is_not_stolen(database_engine: Engine):
         assert version and version.processing_task_id == "legacy-different-owner"
 
 
+def test_queued_republication_preserves_retry_budget(database_engine: Engine):
+    _, version_id, intent_id, task_id = persist(database_engine)
+    with Session(database_engine) as session, session.begin():
+        version = session.get(Version, version_id)
+        assert version
+        version.attempt_count = 2
+    relay = IngestionRelay(build_session_factory(database_engine), lambda _: None)
+    job = relay.claim()
+    assert job and job.task_id == task_id and job.retries == 2
+    assert job.intent_id == intent_id
+    with Session(database_engine) as session:
+        version = session.get(Version, version_id)
+        assert version and version.attempt_count == 2
+
+
+def test_durable_retry_exhaustion_clears_owner_and_is_terminal_once(
+    database_engine: Engine,
+):
+    _, version_id, _, task_id = persist(database_engine)
+    with Session(database_engine) as session, session.begin():
+        version = session.get(Version, version_id)
+        assert version
+        version.attempt_count = 4
+        version.processing_task_id = task_id
+    service = ingestion_service(database_engine, InMemoryDocumentStorage())
+    with service.delivery_lock(version_id) as acquired:
+        assert acquired
+        service.process(version_id, task_id)
+        service.process(version_id, task_id)
+    with Session(database_engine) as session:
+        version = session.get(Version, version_id)
+        assert version and version.status == Status.FAILED
+        assert version.attempt_count == 4 and version.processing_task_id is None
+        assert version.processing_started_at is None and version.extracted_text is None
+        assert version.error_code == "retry_exhausted"
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(AuditEvent)
+                .where(AuditEvent.resource_id == version_id)
+            )
+            == 1
+        )
+
+
 def test_backfill_cutoff_idempotency_and_failed_exclusion(database_engine: Engine):
     org, user = tenant(database_engine)
     before, version = upload(org, user)
