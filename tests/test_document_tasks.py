@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from contextlib import nullcontext
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -18,6 +19,9 @@ from app.documents.tasks import (
 @dataclass
 class RecordingIngestionService:
     processed: list[tuple[UUID, str]] = field(default_factory=list)
+
+    def delivery_lock(self, version_id: UUID):
+        return nullcontext(True)
 
     def process(self, version_id: UUID, task_id: str) -> None:
         self.processed.append((version_id, task_id))

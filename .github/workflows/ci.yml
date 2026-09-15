@@ -142,6 +142,27 @@ jobs:
           docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
           docker compose run --rm api python -m scripts.smoke_worker_redelivery verify
 
+      - name: Check outbox recovery after queued broker message loss
+        run: |
+          docker compose stop worker relay
+          docker compose run --rm -e SUPPORTFLOW_OUTBOX_FAULT_SMOKE=1 api python -m scripts.smoke_outbox_recovery queued-loss
+          docker compose up --detach --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery verify
+          docker compose up --detach --wait --wait-timeout 120 relay
+
+      - name: Check outbox recovery after claimed worker and broker task loss
+        run: |
+          docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery prepare
+          docker compose stop relay
+          docker compose kill --signal SIGKILL worker
+          docker compose restart redis-queue
+          docker compose up --detach --wait --wait-timeout 120 redis-queue
+          docker compose run --rm -e SUPPORTFLOW_OUTBOX_FAULT_SMOKE=1 api python -m scripts.smoke_outbox_recovery claimed-loss
+          docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery verify
+          docker compose up --detach --wait --wait-timeout 120 relay
+
       - name: Show service logs on failure
         if: failure()
         run: docker compose logs --no-color

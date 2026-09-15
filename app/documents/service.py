@@ -18,6 +18,7 @@ from app.documents.models import (
 )
 from app.documents.ports import DocumentStorage, DocumentTaskDispatcher
 from app.documents.repository import DocumentRepository, DocumentWithVersion
+from app.documents.outbox import stage_upload_with_intent
 from app.documents.validation import stage_document_upload
 
 
@@ -140,15 +141,12 @@ class DocumentService:
                 status=DocumentProcessingStatus.QUEUED,
                 attempt_count=0,
             )
-            self._repository.add(document, version)
-
             try:
-                self._audit.record_document_uploaded(
-                    actor_user_id=actor_user_id,
-                    document_id=document_id,
-                    version_number=1,
-                    media_type=staged.media_type,
-                    size_bytes=staged.size_bytes,
+                stage_upload_with_intent(
+                    self._session,
+                    self._organization_id,
+                    document=document,
+                    version=version,
                 )
                 self._session.commit()
             except Exception as exc:
@@ -160,23 +158,7 @@ class DocumentService:
                 )
                 raise DocumentPersistenceError from exc
 
-            try:
-                self._dispatcher.dispatch(version_id)
-            except Exception as exc:
-                logger.warning(
-                    "document_dispatch_failed organization_id=%s "
-                    "document_id=%s version_id=%s error_category=%s",
-                    self._organization_id,
-                    document_id,
-                    version_id,
-                    DocumentLogCategory.DISPATCH_FAILED,
-                )
-                self._record_dispatch_failure(
-                    document=document,
-                    version=version,
-                )
-                raise DocumentDispatchError(document_id) from exc
-
+            # The relay owns broker I/O. A durable commit is sufficient for 202.
             return CreatedDocument(document=document, version=version)
         finally:
             staged.close()

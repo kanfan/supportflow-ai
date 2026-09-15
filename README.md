@@ -207,8 +207,9 @@ outputs, evidence, and runbooks.
 
 The [current roadmap addendum](./docs/distributed-reliability-plan.md) defines
 the gated sequence and measurement criteria; [ADR 0008](./docs/adr/0008-distributed-reliability-showcase.md)
-is proposed for joint review. Start by closing the existing dispatch crash
-window; retain the AI/RAG and human-review milestones. Live AWS deployment is
+accepts R1 only; later Kafka/observability packages remain proposed. R1's
+[integration review](./docs/r1-integration-review.md) describes durable dispatch
+and its evidence limits; retain the AI/RAG and human-review milestones. Live AWS deployment is
 currently deferred while infrastructure and pipeline code remain in scope.
 
 ## Scope boundaries
@@ -481,12 +482,14 @@ while bucket encryption, public-access blocking, versioning, lifecycle, and IAM
 remain #37 platform controls. Responses and logs omit bucket/object identifiers,
 hashes, document bodies, extracted text, and internal exception messages.
 
-After storage succeeds, the document, version `1`, and allowlisted
-`document.uploaded` audit event commit atomically. Only then does the API publish
-the version UUID to Celery. A broker failure leaves an inspectable `failed`
-version rather than falsely reporting a queued job. There is still a small crash
-window between the database commit and queue publication; ADR 0005 records an
-outbox or reconciler as a later reliability decision.
+After storage succeeds, the document, version `1`, allowlisted
+`document.uploaded` audit event and immutable ingestion intent commit atomically.
+The API returns 202 without contacting the broker. The normal Compose relay
+publishes the version UUID with a stable task ID and reconciles lost tasks;
+publication is separate from terminal processing. Broker failures retain the
+intent, with bounded retry and visible unresolved state. See the
+[R1 integration guide](./docs/r1-integration-review.md) for rollout/backfill,
+recovery limits, retention and rollback. Issue #56 stays open until joint review.
 
 Use the `Location` returned by a successful `202 Accepted` response with
 `GET /api/v1/documents/{document_id}`. Both routes are admin-only and use the

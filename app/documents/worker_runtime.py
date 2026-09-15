@@ -75,6 +75,7 @@ class DocumentWorkerRuntime:
 
             service = DocumentIngestionService(
                 resolved_session_factory,
+                max_attempts=self._settings.document_ingestion_max_retries + 1,
                 storage=resolved_storage,
                 scanner=resolved_scanner,
                 extractors=(self._configured_extractors or DocumentExtractorRegistry()),

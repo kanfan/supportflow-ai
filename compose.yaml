@@ -3,14 +3,16 @@ name: supportflow
 x-app-environment: &app-environment
   SUPPORTFLOW_DATABASE_URL: postgresql+psycopg://supportflow:supportflow@postgres:5432/supportflow
   SUPPORTFLOW_REDIS_URL: redis://redis:6379/0
-  SUPPORTFLOW_CELERY_BROKER_URL: redis://redis:6379/0
-  SUPPORTFLOW_CELERY_RESULT_BACKEND_URL: redis://redis:6379/1
+  SUPPORTFLOW_CELERY_BROKER_URL: redis://redis-queue:6379/0
+  SUPPORTFLOW_CELERY_RESULT_BACKEND_URL: redis://redis-queue:6379/1
   SUPPORTFLOW_DOCUMENT_STORAGE_ROOT: /app/.supportflow/documents
 
 x-app-depends-on: &app-depends-on
   postgres:
     condition: service_healthy
   redis:
+    condition: service_healthy
+  redis-queue:
     condition: service_healthy
 
 services:
@@ -32,7 +34,7 @@ services:
 
   redis:
     image: redis:8.4.4-alpine
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -42,6 +44,17 @@ services:
       - "${SUPPORTFLOW_REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
+
+  redis-queue:
+    image: redis:8.4.4-alpine
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - redis-queue-data:/data
 
   api:
     build:
@@ -62,6 +75,32 @@ services:
     volumes:
       - document-storage:/app/.supportflow/documents
 
+  migrate:
+    build:
+      context: .
+    command: alembic upgrade head
+    environment: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  relay:
+    build:
+      context: .
+    command: python -m app.documents.relay_runtime
+    environment: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis-queue:
+        condition: service_healthy
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/ready', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   worker:
     build:
       context: .
@@ -81,4 +120,5 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  redis-queue-data:
   document-storage:

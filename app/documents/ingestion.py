@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from contextlib import closing
+from contextlib import closing, contextmanager
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -12,7 +13,8 @@ from typing import BinaryIO, Callable, cast
 from uuid import UUID
 
 from billiard.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -86,12 +88,51 @@ class DocumentIngestionService:
         scanner: DocumentSafetyScanner,
         extractors: DocumentExtractorRegistry,
         limits: ExtractionLimits,
+        max_attempts: int = 4,
     ) -> None:
         self._session_factory = session_factory
         self._storage = storage
         self._scanner = scanner
         self._extractors = extractors
         self._limits = limits
+        self._max_attempts = max_attempts
+
+    @contextmanager
+    def delivery_lock(self, version_id: UUID) -> Iterator[bool]:
+        # Session-level advisory lock on a dedicated connection, with NO open
+        # transaction during extraction. Worker death closes it; duplicate or
+        # reconciled messages cannot run concurrently even with the same task ID.
+        try:
+            with self._session_factory() as session:
+                engine = session.get_bind()
+                assert isinstance(engine, Engine)
+            with engine.connect() as lock:
+                acquired = lock.scalar(
+                    text("SELECT pg_try_advisory_lock(hashtextextended(:key, 0))"),
+                    {"key": str(version_id)},
+                )
+                lock.commit()
+                if not acquired:
+                    yield False
+                    return
+                try:
+                    yield True
+                finally:
+                    try:
+                        lock.execute(
+                            text(
+                                "SELECT pg_advisory_unlock(hashtextextended(:key, 0))"
+                            ),
+                            {"key": str(version_id)},
+                        )
+                        lock.commit()
+                    except BaseException:
+                        lock.invalidate()  # never return a locked connection to pool
+                        raise
+        except SQLAlchemyError as exc:
+            raise RetryableIngestionError(
+                DocumentErrorCode.DATABASE_UNAVAILABLE
+            ) from exc
 
     def process(self, version_id: UUID, task_id: str) -> IngestionOutcome:
         started_at = perf_counter()
@@ -193,6 +234,19 @@ class DocumentIngestionService:
                             IngestionOutcome.OWNED_BY_ANOTHER_TASK,
                         )
                 else:
+                    if version.attempt_count >= self._max_attempts:
+                        version.status = DocumentProcessingStatus.FAILED
+                        version.error_code = DocumentErrorCode.RETRY_EXHAUSTED.value
+                        AuditEventService(
+                            session, version.organization_id
+                        ).record_document_failed(
+                            document_version_id=version.id,
+                            version_number=version.version_number,
+                            error_code=DocumentErrorCode.RETRY_EXHAUSTED,
+                            attempt_count=version.attempt_count,
+                        )
+                        session.commit()
+                        return ClaimResult(None, IngestionOutcome.FAILED)
                     version.status = DocumentProcessingStatus.EXTRACTING
                     version.processing_task_id = task_id
                     version.attempt_count += 1
