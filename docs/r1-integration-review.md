@@ -1,6 +1,6 @@
 # R1 durable upload and recovery review
 
-Reading time: about 5 minutes. Issue #56 remains open pending joint evidence
+Reading time: about 7 minutes. Issue #56 remains open pending joint evidence
 review. No Kafka or live AWS execution is included.
 
 ## Workflow and engineering boundaries
@@ -31,7 +31,8 @@ count; recovered Celery headers preserve retry position and the DB caps attempts
   timeout. SIGTERM stops new claims; normal shutdown grace is 30 seconds.
 - Publication attempts: 20 maximum, capped exponential retry delay 2-60 seconds.
   After a previous successful publication, at most 3 recovery claims. Exhaustion
-  retains the unresolved intent; it does not mark the document terminal.
+  retains the unresolved intent; it does not mark the document terminal. A
+  bounded, audited operator grant is available below; counters are never reset.
 - Queued reconciliation: default 1200 seconds. Effective delay is at least
   visibility + hard-limit * (max-retries + 1) + 60 * max-retries + 60 seconds.
   Increasing worker/broker limits automatically increases this floor.
@@ -39,7 +40,10 @@ count; recovered Celery headers preserve retry position and the DB caps attempts
   default). Reuse the original owner ID without resetting status or counters.
   A worker that is still alive is protected by the advisory lock.
 - Terminal settlement is observed conservatively by the relay, then retained
-  for at least seven days. No cleanup of pending/unresolved or leased intents.
+  for at least seven days. Late terminal completion also settles an exhausted
+  intent once its relay lease is absent/expired, clears unresolved state and
+  starts a fresh seven-day retention window. No republish/grant is needed.
+  No cleanup of pending/unresolved or leased intents.
   Retained terminal version rows still reject old broker deliveries after cleanup.
 
 `127.0.0.1:8091/live` and `/ready` are relay-local health endpoints, not public
@@ -58,6 +62,9 @@ polling. Unresolved count > 0 requires inspection, not silent automatic reset.
   seven-day cleanup and cutoff-bounded idempotent backfill.
 - `documents/relay_runtime.py`: process-owned clients, local health, shutdown
   and CLI. `compose.yaml`: migration prerequisite and normal relay service.
+  API, worker and relay ALL wait for successful migration; migrate depends only
+  on PostgreSQL. CI also proves a deliberately failing migration starts none of
+  those application processes in a disposable isolated Compose project.
 - `documents/ingestion.py`, `tasks.py`, `worker_runtime.py`: delivery lock and
   durable retry cap; existing terminal audit transaction remains authoritative.
 - New recovery tests and `smoke_outbox_recovery.py`: loss/race evidence, not
@@ -86,6 +93,47 @@ direct-publish API or drop migrations while intents exist. Outstanding intent
 inspection and compatible recovery are required before reopening traffic.
 Backfill is not a general retry-all command. Never delete intents to force a
 downgrade. Cleanup is not an event archive or a replay API.
+
+## One-intent operator recovery after exhaustion
+
+This CLI is for trusted operators already holding DB access, not a public API
+or a way to authenticate as another user. Attribute the action to your own active
+admin membership in the selected tenant. Stop the relay for inspection; repair
+the underlying broker/storage/scanner problem first. Never force-clear worker
+ownership. An active worker lock, live relay lease, ambiguous/recent extraction,
+terminal version, exhausted worker budget or third-used grant is rejected.
+
+Inspect ONE tuple with the following local command; replace only the UUIDs:
+
+```sh
+docker compose exec -T postgres psql -U supportflow -d supportflow -c "SELECT i.id, i.organization_id, i.task_id, i.last_error, i.unresolved_at, i.lease_expires_at, i.publish_attempts, i.recovery_attempts, i.recovery_grants, v.status, v.processing_task_id, v.processing_started_at, v.attempt_count FROM document_ingestion_outbox i JOIN document_versions v ON (v.organization_id,v.id)=(i.organization_id,i.document_version_id) WHERE i.organization_id='<tenant-uuid>' AND i.id='<intent-uuid>';"
+```
+
+After diagnosis, repair and confirmation that no worker owns active execution:
+
+```sh
+docker compose run --rm relay python -m app.documents.relay_runtime --recover-intent <intent-uuid> --organization-id <tenant-uuid> --actor-user-id <your-admin-user-uuid> --dependencies-repaired
+docker compose up --detach --wait relay
+```
+
+The CLI checks Redis connectivity before locking, validates active tenant/admin
+membership, checks authoritative state under row + worker-compatible advisory
+locks, then atomically appends `document.dispatch_rearmed` with allowlisted
+`dependency_repaired` reason and grant number. One grant adds at most one extra
+publication/recovery allowance. Maximum three grants per intent; immutable task
+identity and every worker/publication/recovery counter remain unchanged. There
+is no retry-all, arbitrary reason/body input or counter-reset option. DB/audit
+failure rolls back the grant. If limits or ownership prevent rearm, leave the
+intent unresolved for investigation; do not bypass protections with raw UPDATE.
+
+Observe the selected version and relay health until terminal or unresolved.
+Inspect the selected version's audit events through the existing admin audit
+endpoint. Later terminal completion is reconciled automatically even if the
+intent was unresolved; retention begins only after that reconciliation.
+
+`0006` is still an unmerged revision: rerun the disposable migration round trip
+when updating from an earlier #58 head rather than treating its old local
+schema as a deployed migration contract.
 
 ## Reproduction and evidence limitations
 

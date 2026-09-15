@@ -222,7 +222,7 @@ class DocumentIngestionIntent(UUIDPrimaryKeyMixin, Base):
             "task_id = trim(task_id) AND task_id <> ''", name="task_id_nonempty"
         ),
         CheckConstraint(
-            "publish_attempts >= 0 AND recovery_attempts >= 0",
+            "publish_attempts >= 0 AND recovery_attempts >= 0 AND recovery_grants BETWEEN 0 AND 3",
             name="attempts_nonnegative",
         ),
         CheckConstraint(
@@ -260,6 +260,7 @@ class DocumentIngestionIntent(UUIDPrimaryKeyMixin, Base):
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     publish_attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     recovery_attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    recovery_grants: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     last_error: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

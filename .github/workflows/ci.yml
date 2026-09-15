@@ -95,6 +95,18 @@ jobs:
       - name: Start local stack
         run: docker compose up --detach --build --wait --wait-timeout 180
 
+      - name: Verify failed migration blocks application startup
+        run: |
+          # Isolated project and non-conflicting published ports; own volumes only.
+          export SUPPORTFLOW_POSTGRES_PORT=55432 SUPPORTFLOW_REDIS_PORT=56379 SUPPORTFLOW_API_PORT=58000
+          dc=(docker compose -p supportflow-migration-failure -f compose.yaml -f compose.migration-failure.yaml)
+          trap '"${dc[@]}" down --volumes --remove-orphans' EXIT
+          if "${dc[@]}" up --detach --build api worker relay; then
+            echo "Expected migration failure was not observed"; exit 1
+          fi
+          test "$("${dc[@]}" ps --status running --quiet api worker relay | wc -l)" -eq 0
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$("${dc[@]}" ps --all --quiet migrate)")" -eq 17
+
       - name: Verify database migration round trip
         run: |
           docker compose run --rm api alembic upgrade head

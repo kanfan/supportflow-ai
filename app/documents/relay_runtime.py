@@ -9,6 +9,7 @@ import signal
 from threading import Event, Thread
 from time import monotonic
 from typing import cast
+from uuid import UUID
 
 from sqlalchemy import func, select, text
 
@@ -16,6 +17,7 @@ from app.config import get_settings
 from app.documents.ingestion import INGEST_DOCUMENT_VERSION_TASK
 from app.documents.models import DocumentIngestionIntent as Intent
 from app.documents.relay import IngestionRelay, Publication, RelayPolicy, backfill
+from app.documents.recovery import rearm_intent
 from app.infrastructure.database import build_engine, build_session_factory
 from app.infrastructure.redis import build_redis_client
 from app.worker import create_celery_client
@@ -24,7 +26,24 @@ from app.worker import create_celery_client
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--backfill-cutoff", type=datetime.fromisoformat)
+    parser.add_argument("--recover-intent", type=UUID)
+    parser.add_argument("--organization-id", type=UUID)
+    parser.add_argument("--actor-user-id", type=UUID)
+    parser.add_argument("--dependencies-repaired", action="store_true")
     args = parser.parse_args()
+    if not args.recover_intent and (
+        args.organization_id or args.actor_user_id or args.dependencies_repaired
+    ):
+        parser.error("Recovery options require --recover-intent")
+    if args.recover_intent and (
+        args.backfill_cutoff
+        or not args.organization_id
+        or not args.actor_user_id
+        or not args.dependencies_repaired
+    ):
+        parser.error(
+            "Single-intent recovery requires tenant, actor and repaired-dependency confirmation; no backfill"
+        )
     settings = get_settings()
     engine = build_engine(
         settings.database_url.get_secret_value(),
@@ -32,6 +51,35 @@ def main() -> None:
         ssl_root_cert_path=settings.database_ssl_root_cert_path,
     )
     sessions = build_session_factory(engine)
+    if args.recover_intent:
+        probe = build_redis_client(
+            settings.celery_broker_url.get_secret_value(), timeout_seconds=2
+        )
+        try:
+            grant = rearm_intent(
+                sessions,
+                organization_id=args.organization_id,
+                intent_id=args.recover_intent,
+                actor_user_id=args.actor_user_id,
+                verify_dependencies=probe.ping,
+                extracting_seconds=settings.document_ingestion_hard_time_limit_seconds
+                + settings.celery_visibility_timeout_seconds
+                + 60,
+                max_worker_attempts=settings.document_ingestion_max_retries + 1,
+            )
+            print(
+                json.dumps({"rearmed": str(args.recover_intent), "grant_number": grant})
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from None
+        except Exception:
+            raise SystemExit(
+                "Recovery failed: dependency or database unavailable"
+            ) from None
+        finally:
+            probe.close()
+            engine.dispose()
+        return
     if args.backfill_cutoff is not None:
         try:
             print(

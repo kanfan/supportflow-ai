@@ -98,8 +98,10 @@ class IngestionRelay:
                 intent.unresolved_at, intent.last_error = now, "ownership_ambiguous"
                 return None
             if (
-                intent.publish_attempts >= self.policy.max_publications
-                or intent.recovery_attempts >= self.policy.max_recoveries
+                intent.publish_attempts
+                >= self.policy.max_publications + intent.recovery_grants
+                or intent.recovery_attempts
+                >= self.policy.max_recoveries + intent.recovery_grants
             ):
                 intent.unresolved_at, intent.last_error = now, "attempts_exhausted"
                 return None
@@ -149,6 +151,7 @@ class IngestionRelay:
             return True
 
     def tick(self) -> bool:
+        self.settle_terminal()
         publication = self.claim()
         if publication is None:
             return False
@@ -159,6 +162,41 @@ class IngestionRelay:
         else:
             self.finish(publication, success=True)
         return True
+
+    def settle_terminal(self) -> int:
+        """Late worker completion resolves even a previously exhausted intent."""
+        with self.sessions() as session, session.begin():
+            session.execute(text("SET LOCAL statement_timeout = '2000ms'"))
+            now = session.scalar(select(func.now()))
+            assert isinstance(now, datetime)
+            intents = list(
+                session.scalars(
+                    select(Intent)
+                    .join(
+                        Version,
+                        (Version.id == Intent.document_version_id)
+                        & (Version.organization_id == Intent.organization_id),
+                    )
+                    .where(
+                        Intent.settled_at.is_(None),
+                        Version.status.in_([Status.READY, Status.FAILED]),
+                        or_(
+                            Intent.lease_expires_at.is_(None),
+                            Intent.lease_expires_at <= now,
+                        ),
+                    )
+                    .order_by(Intent.id)
+                    .limit(100)
+                    .with_for_update(of=Intent, skip_locked=True)
+                )
+            )
+            for intent in intents:
+                intent.settled_at = now
+                intent.unresolved_at = None
+                intent.last_error = None
+                intent.lease_token = None
+                intent.lease_expires_at = None
+            return len(intents)
 
     def cleanup(self, *, limit: int = 100) -> int:
         if not 1 <= limit <= 1000:

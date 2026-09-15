@@ -24,7 +24,7 @@ def upgrade() -> None:
             "document_ingestion_outbox", sa.Column(name, sa.DateTime(timezone=True))
         )
     op.add_column("document_ingestion_outbox", sa.Column("lease_token", sa.Uuid()))
-    for name in ("publish_attempts", "recovery_attempts"):
+    for name in ("publish_attempts", "recovery_attempts", "recovery_grants"):
         op.add_column(
             "document_ingestion_outbox",
             sa.Column(name, sa.Integer(), nullable=False, server_default=sa.text("0")),
@@ -33,7 +33,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "attempts_nonnegative",
         "document_ingestion_outbox",
-        "publish_attempts >= 0 AND recovery_attempts >= 0",
+        "publish_attempts >= 0 AND recovery_attempts >= 0 AND recovery_grants BETWEEN 0 AND 3",
     )
     op.create_check_constraint(
         "lease_pair",
@@ -78,6 +78,7 @@ def downgrade() -> None:
         "last_error",
         "publish_attempts",
         "recovery_attempts",
+        "recovery_grants",
         "lease_token",
         "lease_expires_at",
         "published_at",

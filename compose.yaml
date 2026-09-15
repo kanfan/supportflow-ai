@@ -8,6 +8,8 @@ x-app-environment: &app-environment
   SUPPORTFLOW_DOCUMENT_STORAGE_ROOT: /app/.supportflow/documents
 
 x-app-depends-on: &app-depends-on
+  migrate:
+    condition: service_completed_successfully
   postgres:
     condition: service_healthy
   redis:
