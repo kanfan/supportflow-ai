@@ -17,6 +17,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -220,12 +221,47 @@ class DocumentIngestionIntent(UUIDPrimaryKeyMixin, Base):
         CheckConstraint(
             "task_id = trim(task_id) AND task_id <> ''", name="task_id_nonempty"
         ),
+        CheckConstraint(
+            "publish_attempts >= 0 AND recovery_attempts >= 0 AND recovery_grants BETWEEN 0 AND 3",
+            name="attempts_nonnegative",
+        ),
+        CheckConstraint(
+            "(lease_token IS NULL) = (lease_expires_at IS NULL)", name="lease_pair"
+        ),
+        CheckConstraint(
+            "last_error IS NULL OR last_error IN ('publish_unavailable', 'attempts_exhausted', 'ownership_ambiguous')",
+            name="safe_error",
+        ),
+        Index(
+            "ix_ingestion_outbox_due",
+            "available_at",
+            "id",
+            postgresql_where=text("settled_at IS NULL AND unresolved_at IS NULL"),
+        ),
+        Index(
+            "ix_ingestion_outbox_retention",
+            "settled_at",
+            "id",
+            postgresql_where=text("settled_at IS NOT NULL AND unresolved_at IS NULL"),
+        ),
     )
 
     organization_id: Mapped[UUID] = mapped_column(nullable=False)
     document_version_id: Mapped[UUID] = mapped_column(nullable=False)
     # Keep legacy Celery IDs verbatim, not only UUID-shaped IDs. New IDs are UUIDs.
     task_id: Mapped[str] = mapped_column(String(255))
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    unresolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_token: Mapped[UUID | None] = mapped_column()
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    publish_attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    recovery_attempts: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    recovery_grants: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    last_error: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

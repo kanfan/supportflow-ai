@@ -1,0 +1,4 @@
+# Disposable CI-only negative startup test; never use for a working deployment.
+services:
+  migrate:
+    command: ["python", "-c", "raise SystemExit(17)"]

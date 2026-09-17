@@ -174,7 +174,7 @@ def test_admin_upload_persists_private_version_and_safe_audit(
     assert "private-message-canary" not in response.text
 
     version_id = UUID(body["version"]["id"])
-    assert document_harness.dispatcher.dispatched == [version_id]
+    assert document_harness.dispatcher.dispatched == []
 
     with Session(database_engine) as session:
         document = session.get(Document, UUID(body["id"]))
@@ -402,7 +402,7 @@ def test_upload_enforces_exact_ten_mibibyte_boundary(
     assert too_large.status_code == 413
     assert too_large.json()["error"]["code"] == "document_too_large"
     assert len(document_harness.storage.objects) == 1
-    assert len(document_harness.dispatcher.dispatched) == 1
+    assert document_harness.dispatcher.dispatched == []
 
 
 class FailingPutStorage(InMemoryDocumentStorage):
@@ -548,7 +548,7 @@ def test_cleanup_failure_uses_safe_stable_log_category(
         assert session.scalar(select(func.count()).select_from(DocumentVersion)) == 0
 
 
-def test_dispatch_failure_becomes_safe_inspectable_failed_state(
+def test_broker_failure_does_not_prevent_durable_upload(
     document_harness: DocumentHarness,
     database_engine: Engine,
     caplog: pytest.LogCaptureFixture,
@@ -573,9 +573,8 @@ def test_dispatch_failure_becomes_safe_inspectable_failed_state(
         content=content,
     )
 
-    assert response.status_code == 503
-    assert response.json()["error"]["code"] == "dispatch_failed"
-    document_id = response.json()["error"]["details"]["document_id"]
+    assert response.status_code == 202
+    document_id = response.json()["id"]
     assert response.headers["location"] == f"/api/v1/documents/{document_id}"
     assert "broker failure" not in response.text
     assert content.decode() not in response.text
@@ -585,11 +584,9 @@ def test_dispatch_failure_becomes_safe_inspectable_failed_state(
         headers=tenant_headers(token, organization_id),
     )
     assert status_response.status_code == 200
-    assert status_response.json()["version"]["status"] == "failed"
-    assert status_response.json()["version"]["error_code"] == "dispatch_failed"
-    assert status_response.json()["version"]["error_message"] == (
-        "Document processing could not be queued"
-    )
+    assert status_response.json()["version"]["status"] == "queued"
+    assert status_response.json()["version"]["error_code"] is None
+    assert status_response.json()["version"]["error_message"] is None
 
     with Session(database_engine) as session:
         version = session.scalar(
@@ -607,14 +604,66 @@ def test_dispatch_failure_becomes_safe_inspectable_failed_state(
     assert version is not None
     assert actions == [
         AuditAction.DOCUMENT_UPLOADED.value,
-        AuditAction.DOCUMENT_FAILED.value,
     ]
     assert filename not in caplog.text
     assert content.decode() not in caplog.text
     assert version.storage_key not in caplog.text
-    assert "error_category=dispatch_failed" in caplog.text
+    assert document_harness.dispatcher.dispatched == []
     assert "RuntimeError" not in caplog.text
     assert "broker failure with raw internal detail" not in caplog.text
+
+
+def test_real_upload_post_flush_failure_rolls_back_intent_and_storage(
+    document_harness: DocumentHarness,
+    database_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.documents import service as service_module
+    from app.documents.models import DocumentIngestionIntent
+
+    registration, token = register_and_login(
+        document_harness.client, f"atomic-upload-{uuid4().hex}"
+    )
+    original = service_module.stage_upload_with_intent
+    flushed = []
+
+    def fail_after_flush(session, organization_id, **kwargs):
+        intent = original(session, organization_id, **kwargs)
+        assert (
+            session.scalar(select(func.count()).select_from(DocumentIngestionIntent))
+            == 1
+        )
+        assert session.scalar(select(func.count()).select_from(DocumentVersion)) == 1
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(AuditEvent)
+                .where(AuditEvent.action == AuditAction.DOCUMENT_UPLOADED.value)
+            )
+            == 1
+        )
+        flushed.append(intent.id)
+        raise RuntimeError("injected after database flush")
+
+    monkeypatch.setattr(service_module, "stage_upload_with_intent", fail_after_flush)
+    response = upload(
+        document_harness,
+        token=token,
+        organization_id=registration["organization"]["id"],
+    )
+    assert response.status_code == 409 and len(flushed) == 1
+    assert document_harness.storage.objects == {}
+    with Session(database_engine) as fresh:
+        for model in (Document, DocumentVersion, DocumentIngestionIntent):
+            assert fresh.scalar(select(func.count()).select_from(model)) == 0
+        assert (
+            fresh.scalar(
+                select(func.count())
+                .select_from(AuditEvent)
+                .where(AuditEvent.action == AuditAction.DOCUMENT_UPLOADED.value)
+            )
+            == 0
+        )
 
 
 def test_database_enforces_document_tenant_and_version_constraints(

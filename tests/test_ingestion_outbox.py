@@ -27,10 +27,13 @@ def test_repository_preserves_legacy_task_id_without_committing():
 
 
 def test_intent_contains_no_document_body_or_storage_credentials():
-    assert set(DocumentIngestionIntent.__table__.c.keys()) == {
+    assert {
         "id",
         "organization_id",
         "document_version_id",
         "task_id",
         "created_at",
-    }
+    } <= set(DocumentIngestionIntent.__table__.c.keys())
+    assert not {"body", "storage_key", "extracted_text", "password"} & set(
+        DocumentIngestionIntent.__table__.c.keys()
+    )

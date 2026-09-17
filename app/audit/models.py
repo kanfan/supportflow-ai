@@ -30,6 +30,7 @@ class AuditAction(StrEnum):
     DOCUMENT_UPLOADED = "document.uploaded"
     DOCUMENT_READY = "document.ready"
     DOCUMENT_FAILED = "document.failed"
+    DOCUMENT_DISPATCH_REARMED = "document.dispatch_rearmed"
 
 
 class AuditResourceType(StrEnum):

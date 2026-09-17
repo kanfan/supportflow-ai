@@ -91,6 +91,8 @@ class Settings(BaseSettings):
         le=86_400,
     )
     auth_secret_key: SecretStr = SecretStr(DEVELOPMENT_AUTH_SECRET)
+    outbox_poll_seconds: int = Field(default=2, ge=1, le=10)
+    outbox_recovery_seconds: int = Field(default=1200, ge=60, le=86400)
     auth_issuer: str = "supportflow"
     auth_audience: str = "supportflow-api"
     access_token_ttl_minutes: int = Field(default=15, ge=1, le=1440)
@@ -249,6 +251,18 @@ class Settings(BaseSettings):
                 self.celery_result_backend_url,
             )
         return self
+
+    @property
+    def outbox_effective_recovery_seconds(self) -> int:
+        # Strictly exceed visibility plus all bounded worker attempts/backoffs.
+        return max(
+            self.outbox_recovery_seconds,
+            self.celery_visibility_timeout_seconds
+            + self.document_ingestion_hard_time_limit_seconds
+            * (self.document_ingestion_max_retries + 1)
+            + 60 * self.document_ingestion_max_retries
+            + 60,
+        )
 
 
 @lru_cache

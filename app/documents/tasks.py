@@ -74,6 +74,15 @@ def register_document_ingestion_task(
 
         task_id = str(task.request.id or "unknown")
         service = service_provider()
+        with service.delivery_lock(version_id) as acquired:
+            if not acquired:
+                return
+            run_delivery(task, service, version_id, task_id)
+
+    def run_delivery(
+        task: Task, service: DocumentIngestionService, version_id: UUID, task_id: str
+    ) -> None:
+        # Keep the version lock through retry preparation/publication as well.
         try:
             service.process(version_id, task_id)
         except RetryableIngestionError as exc:

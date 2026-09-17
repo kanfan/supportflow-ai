@@ -95,6 +95,18 @@ jobs:
       - name: Start local stack
         run: docker compose up --detach --build --wait --wait-timeout 180
 
+      - name: Verify failed migration blocks application startup
+        run: |
+          # Isolated project and non-conflicting published ports; own volumes only.
+          export SUPPORTFLOW_POSTGRES_PORT=55432 SUPPORTFLOW_REDIS_PORT=56379 SUPPORTFLOW_API_PORT=58000
+          dc=(docker compose -p supportflow-migration-failure -f compose.yaml -f compose.migration-failure.yaml)
+          trap '"${dc[@]}" down --volumes --remove-orphans' EXIT
+          if "${dc[@]}" up --detach --build api worker relay; then
+            echo "Expected migration failure was not observed"; exit 1
+          fi
+          test "$("${dc[@]}" ps --status running --quiet api worker relay | wc -l)" -eq 0
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$("${dc[@]}" ps --all --quiet migrate)")" -eq 17
+
       - name: Verify database migration round trip
         run: |
           docker compose run --rm api alembic upgrade head
@@ -141,6 +153,27 @@ jobs:
           sleep 6
           docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
           docker compose run --rm api python -m scripts.smoke_worker_redelivery verify
+
+      - name: Check outbox recovery after queued broker message loss
+        run: |
+          docker compose stop worker relay
+          docker compose run --rm -e SUPPORTFLOW_OUTBOX_FAULT_SMOKE=1 api python -m scripts.smoke_outbox_recovery queued-loss
+          docker compose up --detach --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery verify
+          docker compose up --detach --wait --wait-timeout 120 relay
+
+      - name: Check outbox recovery after claimed worker and broker task loss
+        run: |
+          docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery prepare
+          docker compose stop relay
+          docker compose kill --signal SIGKILL worker
+          docker compose restart redis-queue
+          docker compose up --detach --wait --wait-timeout 120 redis-queue
+          docker compose run --rm -e SUPPORTFLOW_OUTBOX_FAULT_SMOKE=1 api python -m scripts.smoke_outbox_recovery claimed-loss
+          docker compose -f compose.yaml -f compose.worker-loss.yaml up --detach --force-recreate --wait --wait-timeout 180 worker
+          docker compose run --rm api python -m scripts.smoke_worker_redelivery verify
+          docker compose up --detach --wait --wait-timeout 120 relay
 
       - name: Show service logs on failure
         if: failure()

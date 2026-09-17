@@ -16,6 +16,7 @@ def test_audit_model_maps_reserved_metadata_column_without_update_timestamp() ->
 
 def test_initial_audit_vocabulary_is_explicit_and_stable() -> None:
     assert {action.value for action in AuditAction} == {
+        "document.dispatch_rearmed",
         "document.failed",
         "document.ready",
         "document.uploaded",

@@ -1,7 +1,8 @@
 # R1 foundation review (Issue #56, slice 1)
 
 Reading time: about 3 minutes. This is a schema/transaction foundation, not
-completed durable dispatch. Upload still uses the existing direct publisher.
+completed durable dispatch. At the #57 boundary upload still used the direct
+publisher; the [next slice](./r1-integration-review.md) replaces that behavior.
 
 ## What changes and why
 

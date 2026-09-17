@@ -197,6 +197,19 @@ class AuditEventService:
             },
         )
 
+    def record_document_dispatch_rearmed(
+        self, *, actor_user_id: UUID, version_id: UUID, grant_number: int
+    ) -> AuditEvent:
+        if not 1 <= grant_number <= 3:
+            raise AuditMetadataError("Invalid recovery grant")
+        return self._record(
+            action=AuditAction.DOCUMENT_DISPATCH_REARMED,
+            actor_user_id=actor_user_id,
+            resource_type=AuditResourceType.DOCUMENT_VERSION,
+            resource_id=version_id,
+            metadata={"reason": "dependency_repaired", "grant_number": grant_number},
+        )
+
     def _record(
         self,
         *,
