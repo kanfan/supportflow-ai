@@ -33,7 +33,7 @@ env/
 *.tfplan
 crash.log
 crash.*.log
-# Safe example files remain trackable; keep .terraform.lock.hcl tracked.
+# Safe example files and Terraform provider lockfiles remain trackable.
 !*.tfvars.example
 !*.tfvars.json.example
 
