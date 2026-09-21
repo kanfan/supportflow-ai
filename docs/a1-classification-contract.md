@@ -1,6 +1,6 @@
 # A1: ticket classification contract
 
-Status: Proposed for Eray's review. Date: 2026-09-17.
+Status: Proposed for Eray's review. Updated: 2026-09-21.
 Implementation lead: Emir. Reviewer: Eray.
 
 R1 closed in #56 after #58 merged as `a7cd892` and main CI passed. Emir has
@@ -42,9 +42,31 @@ No free-form rationale or model confidence number in this first contract.
 context means there is not enough information to identify a request.
 Provider failure is an operational error, never an insufficient-context answer.
 
-Fixtures must define each category with examples and tie-breaking rules before
-the schema is frozen. Use primary requested resolution for mixed requests;
-unresolvable ambiguity should abstain. Confirm these defaults during review.
+### Category definitions and overlap rules
+
+| Category | Requested resolution | Example |
+| --- | --- | --- |
+| `account_access` | Login, password, MFA or account-access help | "My MFA code is rejected; I cannot sign in." |
+| `billing` | Invoice, charge, payment or refund help | "Where can I download my invoice?" |
+| `technical_issue` | Restore existing functionality that fails | "Export returns an error." |
+| `how_to` | Guidance using existing functionality | "How do I export a report?" |
+| `feature_request` | Add functionality that is currently missing | "Please add scheduled exports." |
+| `other` | An identifiable request outside these categories | "Can we discuss a partnership?" |
+
+Classify the primary requested resolution, not isolated keywords. Account-access
+and billing requests retain their specific category even when phrased as a
+how-to question or an error report: "How do I reset my password?" is
+`account_access`; "My card was charged twice; please refund it" is `billing`.
+For other functionality, distinguish a broken existing feature from usage
+guidance and a requested new capability. Do not infer that a feature exists or
+is missing when the ticket does not establish it.
+
+For mixed requests, use an explicitly primary request when present. "Export
+fails; please fix it, scheduled exports would also be nice" is
+`technical_issue`. "I need a refund and cannot log in; both are equally urgent"
+has no single primary category and yields `insufficient_context` with null
+category. Do not select `other` to hide ambiguity. Fixtures must include these
+overlap cases and Turkish equivalents before freezing the taxonomy.
 
 ## Input and freshness
 
@@ -60,8 +82,20 @@ email fields, access tokens or organization credentials. For this milestone,
 external evaluations use explicitly synthetic fixtures only.
 
 Proposed bounds: subject 300 characters, opening body 8,000 characters. Reject
-oversize input with a typed error; do not silently truncate. Missing eligible
-message/empty useful content yields insufficient context without a provider call.
+oversize input with a typed error; do not silently truncate. Validate character
+limits on the original selected text before the empty-input shortcut.
+Return `insufficient_context` with null category without a provider call when
+there is no eligible non-system message, or when both subject and selected body
+are empty after Python `str.strip()` whitespace checks. Do not skip a selected
+empty message in favor of a later one. A missing eligible message still takes
+the shortcut even with a nonempty subject (subject length is validated first).
+Whitespace checks do not alter the text used for input identity.
+
+There is no heuristic "useful content" filter. Short nonempty text such as
+"Help" reaches the provider when an eligible message exists; classification
+may then abstain. Punctuation-only content is likewise not locally interpreted
+as empty. A nonempty subject with an eligible whitespace-only body reaches the
+provider. Contract tests must cover each shortcut and non-shortcut explicitly.
 Treat ticket text as untrusted data, including instructions embedded in it.
 
 Canonical input identity includes the exact selected text, message identity,
@@ -74,7 +108,14 @@ Later messages alone do not change this explicitly opening-request policy.
 ## Provider and error boundary
 
 A1a defines a small classification interface and typed timeout, unavailable,
-rate-limited, invalid-output and input-too-large errors. Fake outcomes are
+rate-limited, invalid-output and input-too-large errors. It also defines
+`ProviderAuthenticationError` with stable category `provider_authentication` for
+missing, invalid or rejected provider credentials. This error is non-retryable
+and distinct from SupportFlow user-login failures. It must never become a
+`classified` or `insufficient_context` result. Expose only the safe category,
+not credentials or the raw provider response. A1a's fake adapter must exercise
+this error and prove it is not retried; real credential/status mapping remains
+part of A1b's provider-specific review. Fake outcomes are
 scripted by fixture ID, never used as model-quality evidence. Normal tests
 require no secret or network access. Fake mode must be labelled explicitly.
 
