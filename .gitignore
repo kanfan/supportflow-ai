@@ -19,6 +19,23 @@ env/
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local Terraform state, provider cache, and variable values
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+crash.log
+crash.*.log
+# Safe example files remain trackable; keep .terraform.lock.hcl tracked.
+!*.tfvars.example
+!*.tfvars.json.example
 
 # Editors and operating systems
 .idea/

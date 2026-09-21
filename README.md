@@ -2,6 +2,14 @@
 
 [![CI](https://github.com/kanfan/supportflow-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/kanfan/supportflow-ai/actions/workflows/ci.yml)
 
+> **Source Available — All Rights Reserved**
+>
+> This repository is available for portfolio, educational, evaluation, and
+> reference purposes. Public availability does not grant permission to use,
+> copy, modify, redistribute, deploy, sublicense, or commercially exploit the
+> software, except for the limited permissions and exceptions in
+> [LICENSE](LICENSE), including applicable GitHub platform rights.
+
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
 > **Project status:** Weeks 1-4 are complete on `main`: authentication, verified
@@ -629,6 +637,18 @@ The AWS portfolio environment uses synthetic data only, as required by
 ADR 0007. A future real-data pilot is outside this deployment scope and requires
 a separate decision and privacy review covering data minimization, retention,
 deletion, provider policies, access controls, and applicable KVKK obligations.
+
+## License
+
+This project is source available but is not distributed under an open-source
+license. The source code may be viewed and studied for educational, portfolio,
+evaluation, and reference purposes only; evaluation means source inspection.
+
+Use, copying, modification, redistribution, deployment, sublicensing,
+commercial exploitation, or incorporation into another product requires prior
+written permission from the applicable copyright holders, subject to the
+limited permissions and exceptions in [LICENSE](LICENSE), including applicable
+GitHub platform rights and rights under applicable law.
 
 ## Contributors
 
