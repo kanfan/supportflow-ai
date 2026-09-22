@@ -10,8 +10,9 @@ this AWS topology. The live gates below remain future verification work.
 ## Current execution scope
 
 As of 2026-09-09, live AWS deployment is deferred by the project owners.
-SupportFlow's immediate goal is an open-source engineering portfolio that can
-be run locally, reviewed, and explained with reproducible evidence. AWS remains
+SupportFlow's immediate goal is a source-available engineering portfolio whose
+code and evidence can be inspected. Running or deploying it requires permission
+under the repository [LICENSE](../LICENSE). AWS remains
 in scope: continue Terraform, OIDC/pipeline code, storage/scanner/TLS adapters,
 offline contract tests, and operational documentation. No account creation,
 paid resources, live apply, or scheduled demo window is part of current work.
