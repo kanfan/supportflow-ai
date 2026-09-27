@@ -12,15 +12,16 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status:** Weeks 1-4 are complete on `main`: authentication, verified
-> organization context, admin/agent membership controls, tenant-scoped ticket
-> workflows, append-only audit events, the authenticated agent workspace, secure
-> document uploads, and retry-safe PDF/TXT/Markdown ingestion. The current
-> main CI run at `65275f9` recorded [297 passing tests](https://github.com/kanfan/supportflow-ai/actions/runs/34123283654)
-> with PostgreSQL and Redis integration enabled. Week 5 AWS infrastructure and
-> pipeline code are in progress; live deployment is currently deferred.
-> AI classification and RAG remain follow-up
-> milestones.
+> **Project status (2026-09-22):** Authentication, tenant-scoped tickets,
+> membership/RBAC, append-only audit, the agent workspace, secure document
+> upload/extraction, and R1 durable ingestion dispatch are on `main`. The latest
+> [main CI run](https://github.com/kanfan/supportflow-ai/actions/runs/35624851427)
+> passed 358 tests plus Container smoke (one existing test warning). AI/RAG was
+> selected as the next direction: A1 classification is being specified in
+> [Issue #59](https://github.com/kanfan/supportflow-ai/issues/59) and the
+> approved, still-draft [contract PR #60](https://github.com/kanfan/supportflow-ai/pull/60).
+> No classification or retrieval feature is implemented yet. AWS Terraform and
+> deployment workflow code exist; live AWS verification remains deferred.
 
 ## The problem
 
@@ -40,9 +41,11 @@ The first target users are small and medium-sized Turkish B2B SaaS support teams
 
 This project is being developed by Emir and Eray as a practical, end-to-end learning project after graduation. Both contributors will work across backend development, databases, asynchronous processing, AI/RAG, testing, security, observability, and deployment.
 
-The open-source portfolio goal is a system engineers can run, inspect, test,
-and explain. Current work prioritizes reproducible application behavior,
-reviewed architecture, regression tests, and measured synthetic evaluation.
+The source-available portfolio goal is a system whose design and test evidence
+engineers can inspect and explain. The copyright holders and people with their
+written permission can run and test it under the [LICENSE](LICENSE). Current
+work prioritizes reproducible application behavior, reviewed architecture,
+regression tests, and clearly labelled synthetic evaluation.
 AWS remains part of the engineering scope through Terraform, application
 adapters, CI, and operational runbooks. Live AWS deployment is deferred;
 infrastructure code and offline tests are not deployment evidence.
@@ -60,18 +63,18 @@ We will rotate feature ownership rather than permanently dividing the project in
 
 ## Planned architecture
 
-SupportFlow AI will begin as a modular monolith. The API and background worker will share one codebase while domain modules remain separated by clear boundaries.
+SupportFlow AI is a modular monolith. The API, relay, and background worker share
+one codebase while domain modules remain separated by clear boundaries.
 
 ```text
-Agent UI
-   |
-FastAPI API ------> PostgreSQL + pgvector
-   |
-Redis queue ------> Celery worker
-                         |--- document ingestion
-                         |--- ticket classification
-                         |--- retrieval and generation
-                         |--- LLM and embedding adapters
+Agent UI --> FastAPI API --> PostgreSQL + pgvector
+                |                    |
+                |              durable ingestion intent
+                |                    |
+             Redis sessions      relay --> Redis queue --> Celery worker
+                                                   |--- document ingestion
+                                                   |--- classification (planned)
+                                                   |--- retrieval/generation (planned)
 ```
 
 ### Planned technology stack
@@ -121,20 +124,26 @@ complete platform decision and phased implementation plan are documented in
 [ADR 0004](./docs/adr/0004-aws-deployment-platform.md) and the
 [AWS deployment plan](./docs/aws-deployment-plan.md).
 
-## Current milestone: Week 5 AWS infrastructure and delivery code
+## Current state and next milestone
 
-The current codebase proves the Week 1-4 application, security, ticket, audit,
-agent-workspace, document-upload, and reliable-ingestion foundations. Week 5
-moves that existing system toward a reviewable AWS deployment path using the
-accepted ownership and handoff contract in
+The Week 1-4 application and document workflow foundations are complete. R1
+adds a transactional ingestion intent, a Compose relay, and bounded recovery
+when a broker message or worker is lost; [Issue #56](https://github.com/kanfan/supportflow-ai/issues/56)
+records the accepted evidence. AI/RAG is next, beginning with the offline A1a
+classification contract; real-provider calls and quality evaluation require a
+separate budget and review. Kafka and observability packages remain proposed.
+
+The AWS code path follows the accepted ownership and handoff contract in
 [ADR 0006](./docs/adr/0006-week-5-aws-delivery-and-handoff.md).
-The live staging window is deferred; #37/#39 code work can continue while
-live #40 verification remains pending. See the
+Terraform state, budget, and OIDC foundation code from #53 and the #39 workflow
+scaffold are merged. No AWS account apply or live staging result is claimed;
+#39 and #40 retain their live acceptance gates. See the
 [current portfolio scope](./docs/aws-deployment-plan.md#current-execution-scope).
 
 ### Completed baseline
 
-- [x] `docker compose up` starts PostgreSQL/pgvector, Redis, the API, and the worker.
+- [x] `docker compose up` starts PostgreSQL/pgvector, separate session and queue
+      Redis services, migration, the API, the ingestion relay, and the worker.
 - [x] FastAPI exposes dependency-free `GET /health/live` and dependency-aware `GET /health/ready`.
 - [x] A sample Celery task is processed through Redis.
 - [x] Automated tests cover the API contract and worker foundation.
@@ -153,29 +162,37 @@ live #40 verification remains pending. See the
 - [x] Duplicate/redelivered document tasks converge on one terminal result and audit event.
 - [x] API and worker containers share a private storage volume for local ingestion.
 - [x] A claimed `extracting` task survives worker `SIGKILL` and Redis redelivery without duplicate terminal effects.
+- [x] Document/version, audit, and durable ingestion intent commit atomically;
+      broker publication happens later through the relay.
+- [x] R1 tests cover lost queued tasks, worker death, bounded reconciliation,
+      retention/backfill, and audited one-intent recovery.
 - [x] The full PostgreSQL/Redis suite and Quality/Container smoke workflows pass
-      on `main`; exact-head PR evidence records the current test count.
+      on `main`; the latest run recorded 358 passing tests.
 
 ### Week 5 acceptance targets
 
 - [x] ADR 0006 defines the AWS ownership, credential, apply, handoff, and dependency boundaries.
-- [ ] #37 provisions the reviewed AWS platform foundation and publishes sanitized outputs and runbooks.
-- [ ] #37's first Terraform slice bootstraps retained remote state, account-wide budget alerts, and scoped GitHub OIDC/IAM roles; no live apply is claimed yet.
+- [x] #37's first Terraform slice defines retained remote state, account-wide
+      budget alerts, and scoped GitHub OIDC/IAM roles in code; no live apply is claimed.
+- [ ] The reviewed AWS platform is applied and publishes sanitized outputs and evidence.
 - [x] #38 supplies the S3/scanner/session/readiness application adapters.
 - [ ] #39 deploys one immutable image digest through scoped GitHub OIDC.
 - [ ] #40 records integrated staging, rollback, recovery, security, cost, and teardown evidence.
 - [ ] Sanitized deployment evidence is retained and disposable AWS resources
       are destroyed within 24 hours after the planned verification window.
 
-Repository progress as of 2026-09-09:
+Repository progress as of 2026-09-22:
 
 - [PR #51](https://github.com/kanfan/supportflow-ai/pull/51) merged the #39
   deployment pipeline scaffold; live deployment evidence is still pending.
-- [Draft PR #53](https://github.com/kanfan/supportflow-ai/pull/53) adds the first
-  #37 Terraform state, budget, and OIDC foundation slice. It is under review;
-  no live AWS plan/apply or completed platform handoff is claimed.
+- [PR #53](https://github.com/kanfan/supportflow-ai/pull/53) merged the first
+  #37 Terraform state, budget, and OIDC foundation slice. No live AWS plan/apply
+  or completed platform handoff is claimed.
 - [Draft PR #52](https://github.com/kanfan/supportflow-ai/pull/52) prepares #40's
   verification checklist. Concrete live procedures await the reviewed #37 outputs.
+- [PR #60](https://github.com/kanfan/supportflow-ai/pull/60) has review approval
+  for the A1 classification contract and remains draft pending acceptance/merge;
+  it is not implemented classification.
 
 ## Week 5 ownership and handoff
 
@@ -207,18 +224,22 @@ outputs, evidence, and runbooks.
 1. **Foundation:** local environment, API skeleton, worker, tests, and CI.
 2. **Core support backend:** authentication, organizations, tenant isolation, tickets, and messages.
 3. **Document workflow:** secure upload, versioning, extraction, and reliable background processing.
-4. **AI classification:** provider adapter, structured output, validation, and evaluation fixtures.
-5. **RAG:** chunking, embeddings, tenant-filtered retrieval, citations, and no-answer behavior.
-6. **Human approval:** approve, edit, reject, feedback, and audit events.
-7. **Reliability showcase (planned):** transactional outbox, Kafka events, idempotent consumers, quarantine/DLQ and replay.
-8. **Measured operations (planned):** OpenTelemetry tracing, Prometheus/Grafana, structured logs, lab SLOs and k6 evidence.
+4. **R1 durable dispatch (complete):** atomic document-ingestion intent,
+   relay/reconciliation, bounded recovery, and CI fault evidence.
+5. **AI classification (next):** provider-neutral schemas, input freshness,
+   offline fixtures, then separately reviewed real-provider evaluation.
+6. **RAG (planned):** chunking, embeddings, tenant-filtered retrieval,
+   citations, and no-answer behavior.
+7. **Human approval (planned):** approve, edit, reject, feedback, and audit events.
+8. **Later reliability/operations (proposed):** Kafka consumers, DLQ/replay,
+   OpenTelemetry, Prometheus/Grafana, lab SLOs, and k6 evidence.
 
 The [current roadmap addendum](./docs/distributed-reliability-plan.md) defines
 the gated sequence and measurement criteria; [ADR 0008](./docs/adr/0008-distributed-reliability-showcase.md)
 accepts R1 only; later Kafka/observability packages remain proposed. R1's
 [integration review](./docs/r1-integration-review.md) describes durable dispatch
-and its evidence limits; retain the AI/RAG and human-review milestones. Live AWS deployment is
-currently deferred while infrastructure and pipeline code remain in scope.
+and its evidence limits. AI/RAG is the selected next direction. Live AWS
+deployment remains deferred while infrastructure and pipeline code stay in scope.
 
 ## Scope boundaries
 
@@ -238,6 +259,11 @@ runtime dependency. Throughput, latency and recovery claims await measurements.
 
 ## Local development
 
+The following run, test, and deployment instructions are for the copyright
+holders and parties with their written permission. Public access to this
+repository grants source-inspection rights only, subject to [LICENSE](LICENSE)
+and applicable GitHub platform rights.
+
 ### Prerequisites
 
 - Git
@@ -252,11 +278,12 @@ Copy the example environment file once:
 Copy-Item .env.example .env
 ```
 
-Build the application image and wait for all four services to become healthy:
+Build the application image and wait for the API, relay, worker, PostgreSQL,
+and both Redis services. The one-off migration must succeed before the
+application processes start:
 
 ```powershell
 docker compose up --detach --build --wait
-docker compose run --rm api alembic upgrade head
 ```
 
 Available local endpoints and services:
@@ -268,7 +295,9 @@ Available local endpoints and services:
 | Liveness | <http://127.0.0.1:8000/health/live> |
 | Readiness | <http://127.0.0.1:8000/health/ready> |
 | PostgreSQL/pgvector | `127.0.0.1:5432` |
-| Redis | `127.0.0.1:6379` |
+| Session Redis | `127.0.0.1:6379` |
+| Queue Redis | Internal Compose service `redis-queue:6379` |
+| Ingestion relay | Internal Compose service; readiness on its container's port 8091 |
 
 `/health/live` reports only whether the API process can answer HTTP. The API
 container and future ALB target use `/health/ready`, which requires both a
@@ -295,29 +324,26 @@ database row reaches `extracting`, kills the worker container, then verifies tha
 Redis redelivers the unacknowledged task after restart without changing the
 attempt count or creating another result/audit event. The dedicated
 `compose.worker-loss.yaml` override is smoke-only and cannot be enabled in
-staging/production scanner mode.
+staging/production scanner mode. CI also removes a targeted queued broker
+message and a claimed task after worker loss, then verifies the relay recovers
+the version with one terminal audit event.
 
 Inspect logs or stop the stack:
 
 ```powershell
-docker compose logs --follow api worker
+docker compose logs --follow api relay worker
 docker compose down
 ```
 
 `docker compose down --volumes` also deletes local PostgreSQL and Redis data. Use it only when a clean reset is intended.
 
-### Run the API and worker on the host
+### Host-based debugging
 
-Keep PostgreSQL and Redis in Docker, install the locked Python environment, and start each process in a separate terminal:
-
-```powershell
-docker compose up --detach postgres redis
-uv sync --locked --all-groups
-uv run fastapi dev app/main.py
-uv run celery -A app.worker.celery_app worker --loglevel=INFO
-```
-
-Settings use the `SUPPORTFLOW_` prefix and are documented in `.env.example`.
+Use the full Compose stack above for end-to-end document ingestion: the API and
+worker must share private storage and the queue Redis, while the relay runs as a
+separate process. Host-only API/worker commands from earlier revisions are not
+an equivalent setup. Settings use the `SUPPORTFLOW_` prefix and are documented
+in `.env.example`.
 
 ### Authentication flow
 
@@ -497,7 +523,8 @@ publishes the version UUID with a stable task ID and reconciles lost tasks;
 publication is separate from terminal processing. Broker failures retain the
 intent, with bounded retry and visible unresolved state. See the
 [R1 integration guide](./docs/r1-integration-review.md) for rollout/backfill,
-recovery limits, retention and rollback. Issue #56 stays open until joint review.
+recovery limits, retention and rollback. Issue #56 is closed with the joint
+review and post-merge evidence.
 
 Use the `Location` returned by a successful `202 Accepted` response with
 `GET /api/v1/documents/{document_id}`. Both routes are admin-only and use the
@@ -583,6 +610,8 @@ Install the Git hook once with `uv run pre-commit install`. GitHub Actions repea
 
 The complete AWS-aligned project plan (revision 1.3) is available in
 [SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf](./SupportFlow_AI_Emir_Eray_Proje_Plani_Son_Hal.pdf).
+The PDF is a historical planning baseline. This README states current
+implementation status; [LICENSE](LICENSE) governs usage permissions.
 
 ### Regenerating the project-plan PDF
 
@@ -609,7 +638,7 @@ revision marker before redaction. A mismatch raises a `ValueError` that names
 the expected revision and recovery commit.
 
 - [Current roadmap addendum: distributed reliability](./docs/distributed-reliability-plan.md) (supersedes the PDF schedule for this extension; planned work)
-- [ADR 0008: Distributed reliability showcase](./docs/adr/0008-distributed-reliability-showcase.md) (Proposed)
+- [ADR 0008: Distributed reliability showcase](./docs/adr/0008-distributed-reliability-showcase.md) (Accepted for R1; later packages proposed)
 - [API conventions](./docs/api-conventions.md)
 - [ADR 0001: Authentication and organization context](./docs/adr/0001-auth-and-organization-context.md)
 - [ADR 0002: Initial data model and API standards](./docs/adr/0002-initial-data-model-and-api-standards.md)

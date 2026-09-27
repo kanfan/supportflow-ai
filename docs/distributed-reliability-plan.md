@@ -5,7 +5,7 @@ Reading time: approximately 8 minutes. No new runtime capability is claimed.
 
 ## Purpose and precedence
 
-Extend the open-source portfolio with demonstrable delivery guarantees,
+Extend the source-available portfolio with demonstrable delivery guarantees,
 recovery, observability and measured performance. Keep the support workflow,
 tenant isolation and AI/RAG milestones: infrastructure must support a usable
 product. Live AWS deployment is deferred; AWS Terraform/adapters/pipeline code
