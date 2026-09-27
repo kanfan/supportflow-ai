@@ -63,3 +63,17 @@ boundary plus later creation/status events, including never-transitioned tickets
 After R1, explicitly select Kafka R2 or the original AI/RAG milestone, record
 new estimates and jointly accepted ownership. R2-R4 remain proposed; R1
 approval alone does not commit either contributor to the full extension.
+
+## Post-R1 decision (2026-09-17)
+
+R1 is complete: #58 merged as `a7cd892`, main CI run `35194005743` passed,
+and #56 records acceptance and recovery evidence. This supersedes the earlier
+pre-implementation status above.
+
+Following Eray's AI/RAG proposal, Emir selected AI/RAG before Kafka. The next
+bounded work package is [A1, Issue #59](https://github.com/kanfan/supportflow-ai/issues/59):
+Emir implements and Eray reviews the proposed
+[classification contract](../a1-classification-contract.md). Its technical
+defaults await PR review before implementation. A1a is provisionally estimated
+at 2-3 focused sessions plus review; later dates require re-estimation.
+R2-R4 and live AWS remain deferred; A2/A3 assignments remain proposals.
