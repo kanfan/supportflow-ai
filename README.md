@@ -12,15 +12,17 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status (2026-09-22):** Authentication, tenant-scoped tickets,
+> **Project status (2026-09-30):** Authentication, tenant-scoped tickets,
 > membership/RBAC, append-only audit, the agent workspace, secure document
 > upload/extraction, and R1 durable ingestion dispatch are on `main`. The latest
 > [main CI run](https://github.com/kanfan/supportflow-ai/actions/runs/35624851427)
 > passed 358 tests plus Container smoke (one existing test warning). AI/RAG was
-> selected as the next direction: A1 classification is being specified in
+> selected as the next direction: A1 classification is tracked in
 > [Issue #59](https://github.com/kanfan/supportflow-ai/issues/59) and the
-> approved, still-draft [contract PR #60](https://github.com/kanfan/supportflow-ai/pull/60).
-> No classification or retrieval feature is implemented yet. AWS Terraform and
+> merged [contract PR #60](https://github.com/kanfan/supportflow-ai/pull/60).
+> A1a has offline schemas, input preparation and a scripted fake provider;
+> application integration, evaluation fixtures and real-model quality remain pending.
+> Retrieval is not implemented. AWS Terraform and
 > deployment workflow code exist; live AWS verification remains deferred.
 
 ## The problem
@@ -181,7 +183,7 @@ scaffold are merged. No AWS account apply or live staging result is claimed;
 - [ ] Sanitized deployment evidence is retained and disposable AWS resources
       are destroyed within 24 hours after the planned verification window.
 
-Repository progress as of 2026-09-22:
+Repository progress as of 2026-09-30:
 
 - [PR #51](https://github.com/kanfan/supportflow-ai/pull/51) merged the #39
   deployment pipeline scaffold; live deployment evidence is still pending.
@@ -190,9 +192,9 @@ Repository progress as of 2026-09-22:
   or completed platform handoff is claimed.
 - [Draft PR #52](https://github.com/kanfan/supportflow-ai/pull/52) prepares #40's
   verification checklist. Concrete live procedures await the reviewed #37 outputs.
-- [PR #60](https://github.com/kanfan/supportflow-ai/pull/60) has review approval
-  for the A1 classification contract and remains draft pending acceptance/merge;
-  it is not implemented classification.
+- [PR #60](https://github.com/kanfan/supportflow-ai/pull/60) merged the accepted
+  A1 classification contract as `eb49790`. The offline foundation is documented
+  in the [A1a foundation guide](./docs/a1a-foundation-review.md); #59 remains open.
 
 ## Week 5 ownership and handoff
 
