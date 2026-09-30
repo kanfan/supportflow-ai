@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from hashlib import sha256
 import json
 from typing import Literal
@@ -67,7 +67,10 @@ def prepare_input(
     if len({message.id for message in messages}) != len(messages):
         raise ValueError("Duplicate message identity")
     eligible = [message for message in messages if message.author_type != "system"]
-    opening = min(eligible, key=lambda m: (m.created_at, m.id.int), default=None)
+    # Compare instants: same-zone wall-clock comparison ignores DST folds.
+    opening = min(
+        eligible, key=lambda m: (m.created_at.astimezone(UTC), m.id.int), default=None
+    )
     body = opening.body if opening else ""
     if len(body) > 8000:
         raise InputTooLargeError

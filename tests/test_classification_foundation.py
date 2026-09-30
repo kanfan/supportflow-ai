@@ -5,6 +5,7 @@ import socket
 import traceback
 from typing import Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
@@ -25,6 +26,49 @@ from app.classification.service import classify_opening_request
 
 NOW = datetime(2026, 9, 30, tzinfo=UTC)
 VALID = '{"outcome":"classified","category":"billing"}'
+
+
+@pytest.mark.parametrize("first_minute,second_minute", [(45, 15), (30, 30)])
+def test_dst_fold_selection_and_fingerprint_are_instant_based(
+    first_minute, second_minute
+):
+    zone = ZoneInfo("America/New_York")
+    # The earlier instant deliberately has the larger UUID: fold differences
+    # must not be treated as a genuine tie and resolved using the UUID.
+    earlier = OpeningMessage(
+        UUID(int=2),
+        datetime(2026, 11, 1, 1, first_minute, tzinfo=zone, fold=0),
+        "agent",
+        "earlier request",
+    )
+    later = OpeningMessage(
+        UUID(int=1),
+        datetime(2026, 11, 1, 1, second_minute, tzinfo=zone, fold=1),
+        "customer",
+        "later request",
+    )
+    assert earlier.created_at.astimezone(UTC) < later.created_at.astimezone(UTC)
+    for candidates in ([earlier, later], [later, earlier]):
+        zoned = prepare_input("Subject", candidates)
+        utc = prepare_input(
+            "Subject",
+            [
+                replace(item, created_at=item.created_at.astimezone(UTC))
+                for item in candidates
+            ],
+        )
+        assert zoned.message_id == utc.message_id == earlier.id
+        assert zoned.payload == utc.payload
+        assert zoned.fingerprint == utc.fingerprint
+
+
+def test_equal_instants_across_zones_use_uuid_tiebreak():
+    zone = ZoneInfo("America/New_York")
+    local = datetime(2026, 11, 1, 1, 30, tzinfo=zone, fold=1)
+    lower = OpeningMessage(UUID(int=1), local, "agent", "lower UUID")
+    higher = OpeningMessage(UUID(int=2), local.astimezone(UTC), "agent", "higher UUID")
+    for candidates in ([higher, lower], [lower, higher]):
+        assert prepare_input("Subject", candidates).message_id == lower.id
 
 
 def message(
