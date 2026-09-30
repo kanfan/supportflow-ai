@@ -72,8 +72,10 @@ pre-implementation status above.
 
 Following Eray's AI/RAG proposal, Emir selected AI/RAG before Kafka. The next
 bounded work package is [A1, Issue #59](https://github.com/kanfan/supportflow-ai/issues/59):
-Emir implements and Eray reviews the proposed
+Emir implements and Eray reviews the
 [classification contract](../a1-classification-contract.md). Its technical
-defaults await PR review before implementation. A1a is provisionally estimated
+defaults were accepted through PR #60, merged on 2026-09-27 as `eb49790`.
+A1a's offline foundation is being implemented; this is not model-quality
+acceptance. A1a is provisionally estimated
 at 2-3 focused sessions plus review; later dates require re-estimation.
 R2-R4 and live AWS remain deferred; A2/A3 assignments remain proposals.

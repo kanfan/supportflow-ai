@@ -1,12 +1,14 @@
 # A1: ticket classification contract
 
-Status: Proposed for Eray's review. Updated: 2026-09-21.
+Status: Accepted for A1a through PR #60 (merged 2026-09-27 as `eb49790`).
+Updated: 2026-09-30. A1b retains its separate design/provider/budget review.
 Implementation lead: Emir. Reviewer: Eray.
 
 R1 closed in #56 after #58 merged as `a7cd892` and main CI passed. Emir has
 selected the original AI/RAG direction in response to Eray's proposal. A1 is
 the next bounded package; Kafka R2-R4 and live AWS remain deferred. This
-document proposes concrete defaults, not implemented AI capability.
+document defines the accepted A1a behavior. The first implementation slice
+provides offline primitives only; fixtures/evaluation and A1b remain outstanding.
 
 ## Delivery and ownership
 
@@ -30,7 +32,7 @@ Suggest one ticket category to an agent. Do not change ticket status, assign
 an agent, set urgency or send a reply automatically. Classification is separate
 from retrieval and answer generation.
 
-Proposed schema version: `ticket_classification.v1`. Output has exactly:
+Schema version: `ticket_classification.v1`. Output has exactly:
 
 - `outcome`: `classified` or `insufficient_context`;
 - `category`: `account_access`, `billing`, `technical_issue`, `how_to`,
@@ -81,7 +83,7 @@ subject/body, schema instructions and taxonomy, not user/customer identifiers,
 email fields, access tokens or organization credentials. For this milestone,
 external evaluations use explicitly synthetic fixtures only.
 
-Proposed bounds: subject 300 characters, opening body 8,000 characters. Reject
+Bounds: subject 300 characters, opening body 8,000 characters. Reject
 oversize input with a typed error; do not silently truncate. Validate character
 limits on the original selected text before the empty-input shortcut.
 Return `insufficient_context` with null category without a provider call when
