@@ -47,6 +47,7 @@ failure. These tests prove deterministic software behavior. The injected prompt
 test only proves the fake ignores content; it is not evidence that a real model
 resists prompt injection.
 
-Follow-up A1a work adds at least 48 labelled synthetic cases, a reviewed split,
-and machine-readable evaluation reports. A1b adds actual tenant-scoped result
+The [evaluation slice](./a1a-evaluation-review.md) adds 48 labelled synthetic
+cases, a fixed split awaiting label review, and machine-readable fake reports.
+A1b adds actual tenant-scoped result
 integration and a separately reviewed provider/model budget. #59 stays open.

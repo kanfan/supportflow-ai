@@ -15,13 +15,14 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > **Project status (2026-09-30):** Authentication, tenant-scoped tickets,
 > membership/RBAC, append-only audit, the agent workspace, secure document
 > upload/extraction, and R1 durable ingestion dispatch are on `main`. The latest
-> [main CI run](https://github.com/kanfan/supportflow-ai/actions/runs/35624851427)
-> passed 358 tests plus Container smoke (one existing test warning). AI/RAG was
+> [main CI run at `d375f73`](https://github.com/kanfan/supportflow-ai/actions/runs/36712462237)
+> passed 410 tests plus Container smoke (one existing test warning). AI/RAG was
 > selected as the next direction: A1 classification is tracked in
 > [Issue #59](https://github.com/kanfan/supportflow-ai/issues/59) and the
 > merged [contract PR #60](https://github.com/kanfan/supportflow-ai/pull/60).
 > A1a has offline schemas, input preparation and a scripted fake provider;
-> application integration, evaluation fixtures and real-model quality remain pending.
+> a 48-case synthetic corpus and scripted offline evaluation are available for review.
+> Application integration and real-model quality remain pending.
 > Retrieval is not implemented. AWS Terraform and
 > deployment workflow code exist; live AWS verification remains deferred.
 
@@ -169,7 +170,7 @@ scaffold are merged. No AWS account apply or live staging result is claimed;
 - [x] R1 tests cover lost queued tasks, worker death, bounded reconciliation,
       retention/backfill, and audited one-intent recovery.
 - [x] The full PostgreSQL/Redis suite and Quality/Container smoke workflows pass
-      on `main`; the latest run recorded 358 passing tests.
+      on `main`; the run at `d375f73` recorded 410 passing tests.
 
 ### Week 5 acceptance targets
 
