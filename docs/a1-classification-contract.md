@@ -11,6 +11,9 @@ document defines the accepted A1a behavior. The first implementation slice
 provides offline primitives. The [evaluation slice](./a1a-evaluation-review.md)
 adds synthetic fixtures and a fake reporting harness. Joint label and metric
 review was accepted in PR #63 on 2026-09-30; A1b acceptance remains outstanding.
+PR #63 merged as `912810f` on 2026-10-01. The proposed
+[A1b integration and provider gate](./a1b-integration-contract.md) is a separate
+design review, not approval to implement a real adapter or incur spend.
 
 ## Delivery and ownership
 

@@ -12,17 +12,19 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status (2026-09-30):** Authentication, tenant-scoped tickets,
+> **Project status (2026-10-01):** Authentication, tenant-scoped tickets,
 > membership/RBAC, append-only audit, the agent workspace, secure document
-> upload/extraction, and R1 durable ingestion dispatch are on `main`. The latest
-> [main CI run at `d375f73`](https://github.com/kanfan/supportflow-ai/actions/runs/36712462237)
-> passed 410 tests plus Container smoke (one existing test warning). AI/RAG was
+> upload/extraction, and R1 durable ingestion dispatch are on `main`. The final
+> [A1a PR CI run at `cb9bcaf`](https://github.com/kanfan/supportflow-ai/actions/runs/36822887429)
+> passed 423 tests plus Container smoke (one existing test warning). AI/RAG was
 > selected as the next direction: A1 classification is tracked in
 > [Issue #59](https://github.com/kanfan/supportflow-ai/issues/59) and the
 > merged [contract PR #60](https://github.com/kanfan/supportflow-ai/pull/60).
 > A1a has offline schemas, input preparation and a scripted fake provider;
 > the 48-case synthetic corpus labels and scripted evaluation metrics were jointly reviewed.
-> Application integration and real-model quality remain pending.
+> A1a merged in [PR #63](https://github.com/kanfan/supportflow-ai/pull/63).
+> The [A1b integration/provider contract](docs/a1b-integration-contract.md) is
+> proposed for review; application integration and real-model quality remain pending.
 > Retrieval is not implemented. AWS Terraform and
 > deployment workflow code exist; live AWS verification remains deferred.
 
