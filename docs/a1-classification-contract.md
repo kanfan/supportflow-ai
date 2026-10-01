@@ -11,15 +11,24 @@ document defines the accepted A1a behavior. The first implementation slice
 provides offline primitives. The [evaluation slice](./a1a-evaluation-review.md)
 adds synthetic fixtures and a fake reporting harness. Joint label and metric
 review was accepted in PR #63 on 2026-09-30; A1b acceptance remains outstanding.
+PR #63 merged as `912810f` on 2026-10-01. The proposed
+[A1b integration and provider gate](./a1b-integration-contract.md) is a separate
+design review, not approval to implement a real adapter or incur spend.
 
 ## Delivery and ownership
 
 1. A1a: provider-neutral schemas, deterministic input preparation, fake adapter,
    synthetic labelled fixtures and evaluation harness. No migration, public
    endpoint, credential or external request. Emir implements; Eray reviews.
-2. A1b: tenant-scoped application integration and real provider evaluation,
-   each in a reviewable PR. Before implementation, review persistence/API/job
-   design, model choice, prices, credentials and an explicit run budget.
+2. A1b (proposed sequencing, pending design approval): first review the
+   tenant-scoped persistence/API/execution design and fake-only scope, then
+   implement migration, service and API with a deterministic test adapter in a
+   separate PR. Before real-adapter implementation, separately approve provider,
+   model, current prices, credential handling, request/token limits and explicit
+   spend caps. After adapter review, explicitly authorize each bounded synthetic
+   evaluation. Fake-only design approval does not authorize a real adapter or
+   external calls; external-request and spend authorization remain zero until
+   their separate gates are approved. See the A1b contract for the same sequence.
 3. A2 retrieval is proposed for Eray to implement with Emir reviewing; A3
    cited drafts/human review is proposed for Emir with Eray reviewing. These
    later assignments and estimates require joint confirmation.
