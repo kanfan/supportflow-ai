@@ -40,7 +40,7 @@ def test_fixed_corpus_allocation_and_stable_split():
     corpus, scripts = fixtures()
     assert len(corpus.cases) == len(scripts.cases) == 48
     assert Counter(c.split for c in corpus.cases) == {"development": 32, "held_out": 16}
-    assert corpus.label_review == "pending_eray_review"
+    assert corpus.label_review == "jointly_reviewed"
     assert len({c.id for c in corpus.cases}) == 48
 
 

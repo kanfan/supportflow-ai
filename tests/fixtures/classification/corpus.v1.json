@@ -1,6 +1,6 @@
 {
   "version": "classification_corpus.v1",
-  "label_review": "pending_eray_review",
+  "label_review": "jointly_reviewed",
   "cases": [
     {
       "id": "account_access-01",

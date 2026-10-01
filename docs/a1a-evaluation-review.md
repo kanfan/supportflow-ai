@@ -1,7 +1,9 @@
 # A1a synthetic fixtures and offline evaluation
 
 Issue #59, second offline slice. Emir implements; Eray reviews.
-Label review: **pending Eray's review**. No model-quality acceptance claimed.
+Label review: **jointly_reviewed**. Eray approved all 48 labels and the fixed
+32/16 split in PR #63 on 2026-09-30, independently verifying the metrics.
+No label or split changes were requested. No model-quality acceptance claimed.
 
 ## Corpus and split
 
@@ -76,5 +78,5 @@ Tests check hand-calculated metrics, errors in denominators, split counts,
 determinism, label/script independence, invalid fixtures and overwrite refusal.
 In-process tests forbid socket connections. No provider SDK is introduced.
 
-#59 remains open for joint label/evidence acceptance and A1b's reviewed
+#59 remains open for A1b's reviewed
 tenant-scoped persistence/API/job design, provider/model and budget gates.

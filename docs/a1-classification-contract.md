@@ -1,7 +1,7 @@
 # A1: ticket classification contract
 
 Status: Accepted for A1a through PR #60 (merged 2026-09-27 as `eb49790`).
-Updated: 2026-09-30. A1b retains its separate design/provider/budget review.
+Updated: 2026-10-01. A1b retains its separate design/provider/budget review.
 Implementation lead: Emir. Reviewer: Eray.
 
 R1 closed in #56 after #58 merged as `a7cd892` and main CI passed. Emir has
@@ -9,8 +9,8 @@ selected the original AI/RAG direction in response to Eray's proposal. A1 is
 the next bounded package; Kafka R2-R4 and live AWS remain deferred. This
 document defines the accepted A1a behavior. The first implementation slice
 provides offline primitives. The [evaluation slice](./a1a-evaluation-review.md)
-adds synthetic fixtures and a fake reporting harness; joint label review and
-A1b acceptance remain outstanding.
+adds synthetic fixtures and a fake reporting harness. Joint label and metric
+review was accepted in PR #63 on 2026-09-30; A1b acceptance remains outstanding.
 
 ## Delivery and ownership
 

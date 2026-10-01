@@ -21,7 +21,7 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > [Issue #59](https://github.com/kanfan/supportflow-ai/issues/59) and the
 > merged [contract PR #60](https://github.com/kanfan/supportflow-ai/pull/60).
 > A1a has offline schemas, input preparation and a scripted fake provider;
-> a 48-case synthetic corpus and scripted offline evaluation are available for review.
+> the 48-case synthetic corpus labels and scripted evaluation metrics were jointly reviewed.
 > Application integration and real-model quality remain pending.
 > Retrieval is not implemented. AWS Terraform and
 > deployment workflow code exist; live AWS verification remains deferred.
