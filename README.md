@@ -73,14 +73,20 @@ one codebase while domain modules remain separated by clear boundaries.
 
 ```text
 Agent UI --> FastAPI API --> PostgreSQL + pgvector
-                |                    |
-                |              durable ingestion intent
-                |                    |
-             Redis sessions      relay --> Redis queue --> Celery worker
-                                                   |--- document ingestion
-                                                   |--- classification (planned)
-                                                   |--- retrieval/generation (planned)
+                |                       |
+                |                       +--> durable ingestion intent
+                |                              |
+                |                            relay --> Redis queue --> Celery worker
+                |                                                       |--- document ingestion
+                |                                                       |--- retrieval/generation (planned)
+                +--> Redis sessions
+                +--> Classification service (proposed: synchronous, on-demand)
 ```
+
+The proposed A1b classification path runs through the API, not Celery; it is not
+implemented yet. Fake-only integration follows design approval. Real-provider
+implementation and paid evaluation require their separate approval gates in the
+[A1b contract](docs/a1b-integration-contract.md).
 
 ### Planned technology stack
 

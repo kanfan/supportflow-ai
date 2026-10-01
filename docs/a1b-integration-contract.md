@@ -11,17 +11,22 @@ offline evaluation. PR #63 records joint review of 48 labels and the fixed
 32 development / 16 held-out split. Fake scores are not model-quality evidence.
 The accepted [A1 contract](./a1-classification-contract.md) remains authoritative.
 
-1. Review this application design and the fake-only implementation scope.
+1. Approve this application design and the fake-only implementation scope before
+   starting fake integration.
 2. Implement migration, service and API with a deterministic test adapter in a
-   separate PR. No real adapter is enabled. Review tenant/concurrency evidence.
+   separate PR. No real adapter is implemented or enabled. Review
+   tenant/concurrency evidence.
 3. Complete the provider approval record below, including exact model, current
-   official documentation/pricing, numerical limits and budget. Review it before
+   official documentation/pricing, credential handling, request/token limits and
+   spend caps. Approve it before
    real-adapter implementation. Unfilled fields mean the gate is closed.
 4. Implement and review the adapter with mocked transport tests, then explicitly
    authorize a bounded synthetic evaluation. Review evidence before A1 closure.
 
-This refines the parent contract into separate fake-application and real-provider
-gates; accepting that sequencing is itself part of this design review. Kafka,
+The parent contract's delivery section records this same proposed sequence of
+fake-application and real-provider gates; accepting that sequencing is itself
+part of this design review. Fake-only approval never authorizes external calls
+or spend, which remain zero until the separate gates are approved. Kafka,
 live AWS, retrieval, automatic replies and ticket-state changes remain excluded.
 
 ## Proposed API and authorization
@@ -55,9 +60,17 @@ unavailable until its separate gate. No UI work is required for this slice.
 ## Proposed persistence and freshness
 
 Add classification operations/results with a composite foreign key
-`(organization_id, ticket_id)` to the existing tenant-scoped ticket key. Store:
+`(organization_id, ticket_id)` to the existing tenant-scoped ticket key.
+Also require a non-null `requesting_actor_user_id` and composite foreign key
+`(organization_id, requesting_actor_user_id)` referencing
+`organization_members(organization_id, user_id)`. Resolve the actor from verified
+server-side membership, never a client-supplied user ID. A user existing only in
+another organization cannot be recorded as the requesting actor. This FK proves
+membership identity, not active status or role: retain runtime active-user,
+organization, membership and role checks, including the completion recheck.
+Store:
 
-- operation UUID, tenant/ticket IDs, requesting actor and timestamps;
+- operation UUID, tenant/ticket IDs, `requesting_actor_user_id` and timestamps;
 - selected opening message identity and exact A1a input fingerprint;
 - input-policy, taxonomy, schema, prompt, adapter, provider and pinned model
   identities; a server-owned configuration digest covering generation settings;
@@ -170,6 +183,10 @@ for additional calls. Keep real reports distinct from scripted fake reports.
   missing tickets, and access revoked during execution.
 - Composite-FK/result constraints, migration upgrade/downgrade, stale input and
   configuration, deterministic ties, local shortcuts and unchanged later messages.
+- A database integration test must reject inserting a classification operation
+  for tenant A with a requesting actor who has membership only in tenant B, even
+  when the user and tenant A ticket both exist. Include a same-tenant membership
+  success case; runtime tests separately reject inactive or unauthorized members.
 - Concurrent requests make one fake call; external I/O holds no DB transaction;
   stale completion cannot publish; process loss stays unknown without re-dispatch.
 - Atomic budget reservation under concurrency, retry ceilings/deadlines, unknown
