@@ -1,0 +1,198 @@
+{
+  "version": "classification_fake_scripts.v1",
+  "mode": "fake",
+  "cases": [
+    {
+      "id": "account_access-01",
+      "response": "{\"outcome\":\"classified\",\"category\":\"billing\"}"
+    },
+    {
+      "id": "account_access-02",
+      "response": "{\"outcome\":\"classified\",\"category\":\"account_access\"}"
+    },
+    {
+      "id": "account_access-03",
+      "response": "{\"outcome\":\"classified\",\"category\":\"account_access\"}"
+    },
+    {
+      "id": "account_access-04",
+      "response": "{\"outcome\":\"classified\",\"category\":\"account_access\"}"
+    },
+    {
+      "id": "account_access-05",
+      "response": "{\"outcome\":\"classified\",\"category\":\"account_access\"}"
+    },
+    {
+      "id": "account_access-06",
+      "response": "{\"outcome\":\"classified\",\"category\":\"account_access\"}"
+    },
+    {
+      "id": "billing-01",
+      "response": "{\"outcome\":\"classified\",\"category\":\"billing\"}"
+    },
+    {
+      "id": "billing-02",
+      "response": "{\"outcome\":\"classified\",\"category\":\"billing\"}"
+    },
+    {
+      "id": "billing-03",
+      "response": "{\"outcome\":\"classified\",\"category\":\"billing\"}"
+    },
+    {
+      "id": "billing-04",
+      "response": "{\"outcome\":\"classified\",\"category\":\"billing\"}"
+    },
+    {
+      "id": "billing-05",
+      "response": "{\"outcome\":\"classified\",\"category\":\"other\"}"
+    },
+    {
+      "id": "billing-06",
+      "response": "{\"outcome\":\"classified\",\"category\":\"billing\"}"
+    },
+    {
+      "id": "technical_issue-01",
+      "response": "{\"outcome\":\"classified\",\"category\":\"technical_issue\"}"
+    },
+    {
+      "id": "technical_issue-02",
+      "error": "provider_timeout"
+    },
+    {
+      "id": "technical_issue-03",
+      "response": "{\"outcome\":\"classified\",\"category\":\"technical_issue\"}"
+    },
+    {
+      "id": "technical_issue-04",
+      "response": "{\"outcome\":\"classified\",\"category\":\"technical_issue\"}"
+    },
+    {
+      "id": "technical_issue-05",
+      "response": "{\"outcome\":\"classified\",\"category\":\"technical_issue\"}"
+    },
+    {
+      "id": "technical_issue-06",
+      "response": "{\"outcome\":\"classified\",\"category\":\"technical_issue\"}"
+    },
+    {
+      "id": "how_to-01",
+      "response": "{\"outcome\":\"classified\",\"category\":\"how_to\"}"
+    },
+    {
+      "id": "how_to-02",
+      "response": "{\"outcome\":\"classified\",\"category\":\"how_to\"}"
+    },
+    {
+      "id": "how_to-03",
+      "response": "{\"outcome\":\"classified\",\"category\":\"how_to\"}"
+    },
+    {
+      "id": "how_to-04",
+      "response": "{\"outcome\":\"classified\",\"category\":\"how_to\"}"
+    },
+    {
+      "id": "how_to-05",
+      "response": "{\"outcome\":\"classified\",\"category\":\"how_to\"}"
+    },
+    {
+      "id": "how_to-06",
+      "error": "provider_authentication"
+    },
+    {
+      "id": "feature_request-01",
+      "response": "{\"outcome\":\"classified\",\"category\":\"feature_request\"}"
+    },
+    {
+      "id": "feature_request-02",
+      "response": "{\"outcome\":\"classified\",\"category\":\"feature_request\"}"
+    },
+    {
+      "id": "feature_request-03",
+      "response": "{\"outcome\":\"classified\",\"category\":\"feature_request\"}"
+    },
+    {
+      "id": "feature_request-04",
+      "response": "{\"outcome\":\"classified\",\"category\":\"feature_request\"}"
+    },
+    {
+      "id": "feature_request-05",
+      "response": "{\"outcome\":\"classified\",\"category\":\"feature_request\"}"
+    },
+    {
+      "id": "feature_request-06",
+      "response": "{\"outcome\":\"classified\",\"category\":\"feature_request\"}"
+    },
+    {
+      "id": "other-01",
+      "response": "{\"outcome\":\"classified\",\"category\":\"other\"}"
+    },
+    {
+      "id": "other-02",
+      "response": "{\"outcome\":\"classified\",\"category\":\"other\"}"
+    },
+    {
+      "id": "other-03",
+      "response": "{\"outcome\":\"classified\",\"category\":\"other\"}"
+    },
+    {
+      "id": "other-04",
+      "response": "{\"outcome\":\"classified\",\"category\":\"other\"}"
+    },
+    {
+      "id": "other-05",
+      "response": "{\"outcome\":\"classified\",\"category\":\"other\"}"
+    },
+    {
+      "id": "other-06",
+      "response": "{\"outcome\":\"classified\",\"category\":\"other\"}"
+    },
+    {
+      "id": "insufficient_context-01",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-02",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-03",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-04",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-05",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-06",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-07",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-08",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-09",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-10",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-11",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    },
+    {
+      "id": "insufficient_context-12",
+      "response": "{\"outcome\":\"insufficient_context\",\"category\":null}"
+    }
+  ]
+}
