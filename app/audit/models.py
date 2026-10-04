@@ -31,6 +31,7 @@ class AuditAction(StrEnum):
     DOCUMENT_READY = "document.ready"
     DOCUMENT_FAILED = "document.failed"
     DOCUMENT_DISPATCH_REARMED = "document.dispatch_rearmed"
+    CLASSIFICATION_FINISHED = "classification.finished"
 
 
 class AuditResourceType(StrEnum):
@@ -39,6 +40,7 @@ class AuditResourceType(StrEnum):
     TICKET_MESSAGE = "ticket_message"
     DOCUMENT = "document"
     DOCUMENT_VERSION = "document_version"
+    CLASSIFICATION_OPERATION = "classification_operation"
 
 
 class AuditEvent(UUIDPrimaryKeyMixin, Base):

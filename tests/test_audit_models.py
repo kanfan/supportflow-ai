@@ -16,6 +16,7 @@ def test_audit_model_maps_reserved_metadata_column_without_update_timestamp() ->
 
 def test_initial_audit_vocabulary_is_explicit_and_stable() -> None:
     assert {action.value for action in AuditAction} == {
+        "classification.finished",
         "document.dispatch_rearmed",
         "document.failed",
         "document.ready",
@@ -26,6 +27,7 @@ def test_initial_audit_vocabulary_is_explicit_and_stable() -> None:
         "ticket.status_changed",
     }
     assert {resource.value for resource in AuditResourceType} == {
+        "classification_operation",
         "document",
         "document_version",
         "organization_member",

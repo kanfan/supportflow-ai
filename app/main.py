@@ -8,6 +8,8 @@ from redis import Redis
 
 from app.api.audit_events import router as audit_events_router
 from app.api.auth import router as auth_router
+from app.api.classification import router as classification_router
+from app.classification.application import FakeClassificationRuntime
 from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.api.organization_members import router as organization_members_router
@@ -55,8 +57,14 @@ def create_app(
     browser_session_store: BrowserSessionStore | None = None,
     readiness_probe: ReadinessProbe | None = None,
     redis_client: Redis | None = None,
+    classification_runtime: FakeClassificationRuntime | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
+    if classification_runtime is not None and resolved_settings.environment not in {
+        "local",
+        "test",
+    }:
+        raise ValueError("Fake classification is limited to local/test")
     resolved_document_safety_scanner = resolve_document_safety_scanner(
         resolved_settings,
         document_safety_scanner,
@@ -97,6 +105,8 @@ def create_app(
     application.add_middleware(RequestIdMiddleware)
     application.state.settings = resolved_settings
     application.state.session_factory = session_factory
+    # Explicit local/test injection only; no environment switch enables a real adapter.
+    application.state.classification_runtime = classification_runtime
     application.state.document_safety_scanner = resolved_document_safety_scanner
     application.state.document_storage = resolved_document_storage
     application.state.document_task_dispatcher = (
@@ -147,6 +157,7 @@ def create_app(
     application.include_router(audit_events_router)
     application.include_router(organization_members_router)
     application.include_router(tickets_router)
+    application.include_router(classification_router)
     application.include_router(ui_router)
     return application
 

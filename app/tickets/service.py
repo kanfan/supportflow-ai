@@ -163,7 +163,7 @@ class TicketService:
         body: str,
         current_user_id: UUID,
     ) -> TicketMessage:
-        if self._repository.get_ticket(ticket_id) is None:
+        if self._repository.get_ticket(ticket_id, for_update=True) is None:
             raise TicketNotFoundError
 
         message = TicketMessage(

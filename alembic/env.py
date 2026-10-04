@@ -5,6 +5,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import pool
 from app.audit import models as audit_models  # noqa: F401
+from app.classification import models as classification_models  # noqa: F401
 from app.config import get_settings
 from app.documents import models as document_models  # noqa: F401
 from app.identity import models as identity_models  # noqa: F401

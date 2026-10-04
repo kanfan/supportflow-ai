@@ -1,6 +1,8 @@
 # A1b: application integration and provider gate
 
-Status: Proposed, awaiting Eray's review. Updated: 2026-10-01.
+Status: Accepted for fake-only application integration. Updated: 2026-10-04.
+Eray approved `3f09c2a` in PR #64; merged as `c8d331d`. Implementation evidence
+is a separate review; provider/model, limits, budget and quality gates remain open.
 Issue #59 stays open. Emir implements; Eray reviews. This document authorizes
 no external request, credential setup, paid evaluation, or production rollout.
 
@@ -23,13 +25,12 @@ The accepted [A1 contract](./a1-classification-contract.md) remains authoritativ
 4. Implement and review the adapter with mocked transport tests, then explicitly
    authorize a bounded synthetic evaluation. Review evidence before A1 closure.
 
-The parent contract's delivery section records this same proposed sequence of
-fake-application and real-provider gates; accepting that sequencing is itself
-part of this design review. Fake-only approval never authorizes external calls
+The parent contract's delivery section records this same accepted sequence of
+fake-application and real-provider gates. Fake-only approval never authorizes external calls
 or spend, which remain zero until the separate gates are approved. Kafka,
 live AWS, retrieval, automatic replies and ticket-state changes remain excluded.
 
-## Proposed API and authorization
+## Accepted API and authorization
 
 Reuse `OrganizationContext` and ADMIN/AGENT roles from `app/api/tickets.py`.
 The organization header is only a selector: active user, organization and
@@ -57,7 +58,7 @@ dependency injection with explicit test scripts, never map production tickets
 to fixture labels. Default classification mode is disabled, and real mode is
 unavailable until its separate gate. No UI work is required for this slice.
 
-## Proposed persistence and freshness
+## Accepted persistence and freshness
 
 Add classification operations/results with a composite foreign key
 `(organization_id, ticket_id)` to the existing tenant-scoped ticket key.
@@ -92,7 +93,7 @@ completion returns 409; an explicit later request may classify the new input.
 
 ## Execution and transaction boundary
 
-Propose synchronous, bounded on-demand execution for the first slice. No Celery
+Use synchronous, bounded on-demand execution for the first slice. No Celery
 classification job and no document-ingestion outbox reuse. Queued execution is
 a separate review if request duration/load later requires it.
 
@@ -193,8 +194,8 @@ for additional calls. Keep real reports distinct from scripted fake reports.
   usage, disabled mode, and no secrets/text in responses, logs or audit metadata.
 - Normal tests remain offline; existing CI and container smoke remain green.
 
-Eray: please confirm synchronous-first scope, claim/unknown reconciliation,
-API/error envelope, locking/freshness and the split approval gates. Separately
+Synchronous-first scope, claim/unknown reconciliation, API/error envelope,
+locking/freshness and the split approval gates were accepted in PR #64. Separately
 agree provider/model, token/request/spend caps and the proposed quality thresholds
 before real-adapter work. #59 closes only after both contributors review the
 agreed application slice and real-provider evidence (or explicitly reduce scope).

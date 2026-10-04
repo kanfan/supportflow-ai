@@ -210,6 +210,23 @@ class AuditEventService:
             metadata={"reason": "dependency_repaired", "grant_number": grant_number},
         )
 
+    def record_classification_finished(
+        self,
+        *,
+        actor_user_id: UUID,
+        operation_id: UUID,
+        state: str,
+    ) -> AuditEvent:
+        if state not in {"succeeded", "failed", "stale", "unknown"}:
+            raise AuditMetadataError("Invalid classification state")
+        return self._record(
+            action=AuditAction.CLASSIFICATION_FINISHED,
+            actor_user_id=actor_user_id,
+            resource_type=AuditResourceType.CLASSIFICATION_OPERATION,
+            resource_id=operation_id,
+            metadata={"mode": "fake", "state": state},
+        )
+
     def _record(
         self,
         *,

@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from hashlib import sha256
 from typing import Protocol
 
 from app.classification.errors import ClassificationError
@@ -35,3 +36,13 @@ class FakeClassificationProvider:
         if isinstance(self._response, str):
             return self._response
         raise self._response()
+
+    @property
+    def script_fingerprint(self) -> str:
+        """Internal config identity; never expose script text in application rows."""
+        value = (
+            self._response
+            if isinstance(self._response, str)
+            else self._response.category
+        )
+        return sha256(value.encode("utf-8")).hexdigest()
