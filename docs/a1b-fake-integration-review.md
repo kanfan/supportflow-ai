@@ -9,7 +9,12 @@ provider integration, token/cost measurement, customer-data rollout or paid call
 Migration `0007_classification` adds tenant-scoped operations with ticket and
 requesting-actor membership composite foreign keys. A result preserves exact
 opening-input identity, versions and a configuration digest including the fake
-script hash. No ticket body, subject, prompt text or raw response is copied.
+script hash. The versioned canonical hash tags response/error scripts separately
+and includes the error's qualified type and category. Switching from an error to
+an equal raw response string invalidates reuse. This hash-format correction
+changes earlier fake configuration digests; existing rows remain historical and
+read as stale, never rewritten in place. No ticket body, subject, prompt text or
+raw response is copied.
 
 The two ADMIN/AGENT routes are `GET` and `POST`
 `/api/v1/tickets/{ticket_id}/classification`. They use the existing bearer token
@@ -91,7 +96,10 @@ New tests cover model/runtime guards, both API routes, tenant/actor FKs, databas
 result constraints, active membership and user/organization state, stale input
 and configuration, local shortcuts, oversized input, safe provider errors,
 concurrent claims, expiry/late completion, no checked-out connections during I/O,
-append locking, audit rollback and downgrade protection.
+append locking, audit rollback and downgrade protection. Audit rollback tests
+flush both completion updates and the real audit insert, verify their values
+with SQL inside the transaction, then inject failure. Fresh sessions prove both
+writes rolled back for successful completion and terminal provider errors.
 
 ```powershell
 uv run pytest tests/test_classification_application_contract.py -q

@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from hashlib import sha256
+import json
 from typing import Protocol
 
 from app.classification.errors import ClassificationError
@@ -40,9 +41,20 @@ class FakeClassificationProvider:
     @property
     def script_fingerprint(self) -> str:
         """Internal config identity; never expose script text in application rows."""
-        value = (
-            self._response
-            if isinstance(self._response, str)
-            else self._response.category
+        # Domain separation is essential: a raw response equal to an error's
+        # category must not reuse that error script's application claim.
+        if isinstance(self._response, str):
+            script = {"kind": "response", "value": self._response}
+        else:
+            script = {
+                "kind": "error",
+                "type": f"{self._response.__module__}.{self._response.__qualname__}",
+                "category": self._response.category,
+            }
+        canonical = json.dumps(
+            {"version": "fake_script.v2", "script": script},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
         )
-        return sha256(value.encode("utf-8")).hexdigest()
+        return sha256(canonical.encode("utf-8")).hexdigest()

@@ -463,25 +463,101 @@ def test_append_participates_in_ticket_lock(harness: Harness) -> None:
                 )
 
 
+@pytest.mark.parametrize(
+    "terminal_error", [False, True], ids=["success", "terminal-error"]
+)
 def test_audit_failure_rolls_back_completion_leaves_unrepeatable_claim(
-    harness: Harness, monkeypatch
+    harness: Harness, monkeypatch, terminal_error: bool
 ) -> None:
     h = harness
+    if terminal_error:
+        h.fake = FakeClassificationProvider(
+            "error", {"error": ProviderAuthenticationError}
+        )
+        h.app.state.classification_runtime = FakeClassificationRuntime(h.fake)
     service = h.service
+    real_audit = service._audit
+    flushed = []
 
-    def fail(*_args):
-        raise RuntimeError("audit unavailable")
+    def fail_after_flush(session: Session, operation: ClassificationOperation) -> None:
+        real_audit(session, operation)
+        session.flush()
+        # Select columns, not ORM objects: prove both writes reached PostgreSQL,
+        # rather than inspecting the identity map's pending in-memory values.
+        row = session.execute(
+            select(
+                ClassificationOperation.state,
+                ClassificationOperation.outcome,
+                ClassificationOperation.category,
+                ClassificationOperation.error_code,
+                ClassificationOperation.completed_at,
+            ).where(ClassificationOperation.id == operation.id)
+        ).one()
+        assert row.state == ("failed" if terminal_error else "succeeded")
+        assert row.outcome == (None if terminal_error else "classified")
+        assert row.category == (None if terminal_error else "technical_issue")
+        assert row.error_code == ("provider_authentication" if terminal_error else None)
+        assert row.completed_at is not None
+        metadata = session.scalar(
+            select(AuditEvent.event_metadata).where(
+                AuditEvent.resource_id == operation.id,
+                AuditEvent.action == "classification.finished",
+            )
+        )
+        assert metadata == {"mode": "fake", "state": row.state}
+        flushed.append(operation.id)
+        raise RuntimeError("audit unavailable after flush")
 
-    monkeypatch.setattr(service, "_audit", fail)
-    with pytest.raises(RuntimeError, match="audit unavailable"):
+    monkeypatch.setattr(service, "_audit", fail_after_flush)
+    with pytest.raises(RuntimeError, match="audit unavailable after flush"):
         service.classify(*h.ids)
+    assert len(flushed) == 1
     with Session(h.engine) as session:
-        row = session.scalar(select(ClassificationOperation))
+        row = session.get(ClassificationOperation, flushed[0])
         assert row and row.state == "in_progress" and row.outcome is None
+        assert (
+            row.category is row.error_code is row.completed_at is row.elapsed_ms is None
+        )
+        assert row.attempt_count == 1
         assert session.scalar(select(func.count()).select_from(AuditEvent)) == 0
-    with pytest.raises(ApplicationClassificationError):
+    with pytest.raises(ApplicationClassificationError) as duplicate:
         h.service.classify(*h.ids)
+    assert duplicate.value.code == "classification_in_progress"
     assert h.fake.calls == 1
+
+
+def test_error_to_equal_response_script_change_is_stale_and_gets_new_claim(
+    harness: Harness,
+) -> None:
+    h = harness
+    error = FakeClassificationProvider("error", {"error": ProviderUnavailableError})
+    response = FakeClassificationProvider(
+        "response", {"response": "provider_unavailable"}
+    )
+    h.app.state.classification_runtime = FakeClassificationRuntime(error)
+    first = h.client.post(h.url, headers=h.headers)
+    assert first.status_code == 503
+    assert first.json()["error"]["code"] == "provider_unavailable"
+    old = h.client.get(h.url, headers=h.headers).json()
+    assert old["state"] == "unknown"
+
+    # Same configuration_version: the changed script alone must change identity.
+    h.app.state.classification_runtime = FakeClassificationRuntime(response)
+    stale = h.client.get(h.url, headers=h.headers).json()
+    assert stale["state"] == "stale" and stale["result_id"] == old["result_id"]
+    second = h.client.post(h.url, headers=h.headers)
+    assert second.status_code == 502
+    assert second.json()["error"]["code"] == "invalid_provider_output"
+    new = h.client.get(h.url, headers=h.headers).json()
+    assert new["state"] == "failed" and new["result_id"] != old["result_id"]
+    assert h.client.post(h.url, headers=h.headers).status_code == 502
+    assert error.calls == response.calls == 1
+    with Session(h.engine) as session:
+        rows = session.scalars(select(ClassificationOperation)).all()
+        assert len(rows) == 2
+        assert {row.state for row in rows} == {"unknown", "failed"}
+        assert len({row.config_digest for row in rows}) == 2
+        assert len({row.input_fingerprint for row in rows}) == 1
 
 
 def test_unknown_exception_is_sanitized(harness: Harness, monkeypatch) -> None:

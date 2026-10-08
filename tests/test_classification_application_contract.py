@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.audit.service import AuditEventService, AuditMetadataError
 from app.classification.application import FakeClassificationRuntime
+from app.classification.errors import ProviderUnavailableError
 from app.classification.models import ClassificationOperation
 from app.classification.providers import FakeClassificationProvider
 from app.config import Settings
@@ -35,6 +36,26 @@ def test_runtime_digest_tracks_script_and_config_version() -> None:
 def test_configuration_version_is_bounded(version: str) -> None:
     with pytest.raises(ValueError):
         FakeClassificationRuntime(fake(), version)
+
+
+def test_error_and_equal_raw_response_have_distinct_script_and_runtime_digests() -> (
+    None
+):
+    error = FakeClassificationProvider("test", {"test": ProviderUnavailableError})
+    response = fake("provider_unavailable")
+    same_error = FakeClassificationProvider(
+        "other-id", {"other-id": ProviderUnavailableError}
+    )
+    assert error.script_fingerprint == same_error.script_fingerprint
+    assert error.script_fingerprint != response.script_fingerprint
+    assert (
+        FakeClassificationRuntime(error).digest
+        == FakeClassificationRuntime(same_error).digest
+    )
+    assert (
+        FakeClassificationRuntime(error).digest
+        != FakeClassificationRuntime(response).digest
+    )
 
 
 def test_default_application_has_no_classification_provider() -> None:
