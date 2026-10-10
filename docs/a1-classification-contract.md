@@ -1,7 +1,7 @@
 # A1: ticket classification contract
 
 Status: Accepted for A1a through PR #60 (merged 2026-09-27 as `eb49790`).
-Updated: 2026-10-04. A1b fake-only design is accepted; provider/budget review remains separate.
+Updated: 2026-10-10. A1b fake-only implementation is accepted; provider/budget review remains separate.
 Implementation lead: Emir. Reviewer: Eray.
 
 R1 closed in #56 after #58 merged as `a7cd892` and main CI passed. Emir has
@@ -10,7 +10,8 @@ the next bounded package; Kafka R2-R4 and live AWS remain deferred. This
 document defines the accepted A1a behavior. The first implementation slice
 provides offline primitives. The [evaluation slice](./a1a-evaluation-review.md)
 adds synthetic fixtures and a fake reporting harness. Joint label and metric
-review was accepted in PR #63 on 2026-09-30; A1b implementation acceptance remains outstanding.
+review was accepted in PR #63 on 2026-09-30. A1b fake-only implementation was
+accepted in PR #65 (merged `bcbd5ae`); real-provider acceptance remains outstanding.
 PR #63 merged as `912810f` on 2026-10-01. The
 [A1b integration and provider gate](./a1b-integration-contract.md) was accepted
 for fake-only integration in PR #64 (merged `c8d331d` on 2026-10-04), not for a
