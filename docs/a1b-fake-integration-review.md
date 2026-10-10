@@ -3,6 +3,9 @@
 Issue #59 remains open. Emir implements; Eray reviews. Design PR #64 was approved
 at `3f09c2a` and merged as `c8d331d`. This slice claims no real-model quality,
 provider integration, token/cost measurement, customer-data rollout or paid call.
+Eray accepted implementation head `2bb31eb` in PR #65 on 2026-10-10; it merged
+as `bcbd5ae`. Both reported blockers were resolved before acceptance. PR CI
+passed 465 tests and Container smoke. Real-provider approval remains separate.
 
 ## Scope and use
 

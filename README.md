@@ -12,11 +12,11 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status (2026-10-04):** Authentication, tenant-scoped tickets,
+> **Project status (2026-10-10):** Authentication, tenant-scoped tickets,
 > membership/RBAC, append-only audit, the agent workspace, secure document
 > upload/extraction, and R1 durable ingestion dispatch are on `main`. The final
-> [A1a PR CI run at `cb9bcaf`](https://github.com/kanfan/supportflow-ai/actions/runs/36822887429)
-> passed 423 tests plus Container smoke (one existing test warning). AI/RAG was
+> [A1b PR CI run at `2bb31eb`](https://github.com/kanfan/supportflow-ai/actions/runs/37780049216)
+> passed 465 tests plus Container smoke (one existing test warning). AI/RAG was
 > selected as the next direction: A1 classification is tracked in
 > [Issue #59](https://github.com/kanfan/supportflow-ai/issues/59) and the
 > merged [contract PR #60](https://github.com/kanfan/supportflow-ai/pull/60).
@@ -25,7 +25,10 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > A1a merged in [PR #63](https://github.com/kanfan/supportflow-ai/pull/63).
 > The [A1b integration/provider contract](docs/a1b-integration-contract.md) is
 > accepted for fake-only integration. Its [implementation slice](docs/a1b-fake-integration-review.md)
-> adds persistence and synchronous API paths for review; real-model quality remains pending.
+> merged in [PR #65](https://github.com/kanfan/supportflow-ai/pull/65), adding
+> default-disabled fake-only persistence and synchronous API paths. The separate
+> [provider/evaluation proposal](docs/a1b-provider-evaluation-proposal.md) is under
+> review; real providers, paid calls and real-model quality remain unapproved.
 > Retrieval is not implemented. AWS Terraform and
 > deployment workflow code exist; live AWS verification remains deferred.
 
@@ -84,8 +87,8 @@ Agent UI --> FastAPI API --> PostgreSQL + pgvector
                 +--> Classification service (fake-only: synchronous, on-demand)
 ```
 
-The A1b classification path runs through the API, not Celery; this branch adds
-fake-only integration for review, disabled unless explicitly injected in local/test.
+The A1b classification path runs through the API, not Celery; fake-only integration
+is merged, disabled unless explicitly injected in local/test.
 Real-provider
 implementation and paid evaluation require their separate approval gates in the
 [A1b contract](docs/a1b-integration-contract.md).
