@@ -1,7 +1,7 @@
 # A1: ticket classification contract
 
 Status: Accepted for A1a through PR #60 (merged 2026-09-27 as `eb49790`).
-Updated: 2026-10-01. A1b retains its separate design/provider/budget review.
+Updated: 2026-10-04. A1b fake-only design is accepted; provider/budget review remains separate.
 Implementation lead: Emir. Reviewer: Eray.
 
 R1 closed in #56 after #58 merged as `a7cd892` and main CI passed. Emir has
@@ -10,17 +10,19 @@ the next bounded package; Kafka R2-R4 and live AWS remain deferred. This
 document defines the accepted A1a behavior. The first implementation slice
 provides offline primitives. The [evaluation slice](./a1a-evaluation-review.md)
 adds synthetic fixtures and a fake reporting harness. Joint label and metric
-review was accepted in PR #63 on 2026-09-30; A1b acceptance remains outstanding.
-PR #63 merged as `912810f` on 2026-10-01. The proposed
-[A1b integration and provider gate](./a1b-integration-contract.md) is a separate
-design review, not approval to implement a real adapter or incur spend.
+review was accepted in PR #63 on 2026-09-30; A1b implementation acceptance remains outstanding.
+PR #63 merged as `912810f` on 2026-10-01. The
+[A1b integration and provider gate](./a1b-integration-contract.md) was accepted
+for fake-only integration in PR #64 (merged `c8d331d` on 2026-10-04), not for a
+real adapter or spend. Its [implementation review](./a1b-fake-integration-review.md)
+records the fake-only scope and evidence limits.
 
 ## Delivery and ownership
 
 1. A1a: provider-neutral schemas, deterministic input preparation, fake adapter,
    synthetic labelled fixtures and evaluation harness. No migration, public
    endpoint, credential or external request. Emir implements; Eray reviews.
-2. A1b (proposed sequencing, pending design approval): first review the
+2. A1b (sequencing accepted in PR #64): first review the
    tenant-scoped persistence/API/execution design and fake-only scope, then
    implement migration, service and API with a deterministic test adapter in a
    separate PR. Before real-adapter implementation, separately approve provider,

@@ -12,7 +12,7 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status (2026-10-01):** Authentication, tenant-scoped tickets,
+> **Project status (2026-10-04):** Authentication, tenant-scoped tickets,
 > membership/RBAC, append-only audit, the agent workspace, secure document
 > upload/extraction, and R1 durable ingestion dispatch are on `main`. The final
 > [A1a PR CI run at `cb9bcaf`](https://github.com/kanfan/supportflow-ai/actions/runs/36822887429)
@@ -24,7 +24,8 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > the 48-case synthetic corpus labels and scripted evaluation metrics were jointly reviewed.
 > A1a merged in [PR #63](https://github.com/kanfan/supportflow-ai/pull/63).
 > The [A1b integration/provider contract](docs/a1b-integration-contract.md) is
-> proposed for review; application integration and real-model quality remain pending.
+> accepted for fake-only integration. Its [implementation slice](docs/a1b-fake-integration-review.md)
+> adds persistence and synchronous API paths for review; real-model quality remains pending.
 > Retrieval is not implemented. AWS Terraform and
 > deployment workflow code exist; live AWS verification remains deferred.
 
@@ -80,11 +81,12 @@ Agent UI --> FastAPI API --> PostgreSQL + pgvector
                 |                                                       |--- document ingestion
                 |                                                       |--- retrieval/generation (planned)
                 +--> Redis sessions
-                +--> Classification service (proposed: synchronous, on-demand)
+                +--> Classification service (fake-only: synchronous, on-demand)
 ```
 
-The proposed A1b classification path runs through the API, not Celery; it is not
-implemented yet. Fake-only integration follows design approval. Real-provider
+The A1b classification path runs through the API, not Celery; this branch adds
+fake-only integration for review, disabled unless explicitly injected in local/test.
+Real-provider
 implementation and paid evaluation require their separate approval gates in the
 [A1b contract](docs/a1b-integration-contract.md).
 

@@ -34,13 +34,14 @@ class TicketRepository:
             )
         )
 
-    def get_ticket(self, ticket_id: UUID) -> Ticket | None:
-        return self._session.scalar(
-            select(Ticket).where(
-                Ticket.organization_id == self._organization_id,
-                Ticket.id == ticket_id,
-            )
+    def get_ticket(self, ticket_id: UUID, *, for_update: bool = False) -> Ticket | None:
+        query = select(Ticket).where(
+            Ticket.organization_id == self._organization_id,
+            Ticket.id == ticket_id,
         )
+        if for_update:
+            query = query.with_for_update()
+        return self._session.scalar(query)
 
     def list_ticket_messages(self, ticket_id: UUID) -> list[TicketMessage]:
         return list(

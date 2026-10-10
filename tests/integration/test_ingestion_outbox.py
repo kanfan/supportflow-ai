@@ -239,5 +239,5 @@ def test_downgrade_retains_outstanding_intents(
         assert fresh.get(DocumentIngestionIntent, intent_id) is not None
         assert (
             fresh.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0006_outbox_lifecycle"
+            == "0007_classification"
         )
