@@ -1,11 +1,15 @@
 # A1b: application integration and provider gate
 
-Status: Accepted for fake-only application integration. Updated: 2026-10-10.
+Status: Accepted for fake-only application integration. Updated: 2026-11-02.
 Eray approved `3f09c2a` in PR #64; merged as `c8d331d`. Implementation evidence
 was accepted in PR #65 at `2bb31eb`, merged as `bcbd5ae`; provider/model, limits,
 budget and quality gates remain open. The separate
 [provider/evaluation proposal](./a1b-provider-evaluation-proposal.md) contains
 unapproved candidate values, not active permissions or completed gate entries.
+PR #66 merged that proposal as documentation only. The follow-up
+[accounting/reporting design](./a1b-accounting-design.md) records tier/denominator
+clarifications, proposed ledger boundaries, Eray's designated account ownership
+(confirmation pending), and the newly discovered model-deprecation gate.
 Issue #59 stays open. Emir implements; Eray reviews. This document authorizes
 no external request, credential setup, paid evaluation, or production rollout.
 
