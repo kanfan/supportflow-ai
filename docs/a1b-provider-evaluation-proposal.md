@@ -1,6 +1,8 @@
 # A1b provider and synthetic evaluation proposal
 
 Status: PROPOSED, not approved. Prepared 2026-10-10. Emir implements; Eray reviews.
+Documentation-only merge accepted in PR #66 at `bcdc775`, merged as `2ea5225`
+on 2026-11-02. No implementation/run checklist item was approved by that merge.
 Issue #59 stays open. PR #65's fake-only integration was approved at `2bb31eb`
 and merged as `bcbd5ae`. That acceptance does not authorize a real provider.
 **Effective external-call allowance: 0. Effective spend allowance: USD 0.**
@@ -10,6 +12,17 @@ credential read, account provisioned, adapter implemented or model called by thi
 PR. Public documentation research is not an authenticated model evaluation.
 
 ## Candidate and rationale for review
+
+**Recheck 2026-11-02:** the pinned GPT-4.1 mini snapshot is now deprecated,
+with API removal scheduled for **2027-01-14**. The following original candidate
+and cost calculation are retained as proposal history, not renewed model approval.
+Do not silently substitute another model. Jointly decide whether to retire this
+candidate or explicitly retain it for a bounded pre-shutdown experiment; any new
+model needs a fresh snapshot, pricing, token-accounting and quality review.
+[Official deprecations](https://developers.openai.com/api/docs/deprecations).
+The model page still lists USD 0.40 input / USD 1.60 output per million tokens
+on this recheck; unchanged prices do not remove the lifecycle gate.
+[Model page](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
 
 Propose OpenAI with the pinned `gpt-4.1-mini-2025-04-14` snapshot as a first
 baseline for this small, two-field classification task. Its official model page
@@ -35,8 +48,11 @@ does not establish semantic correctness; keep the existing local strict validato
 
 Proposed request controls include `max_output_tokens=256`, `store=false`,
 `stream=false`, `background=false` and a strict JSON schema under `text.format`;
-no previous response or conversation ID. Use the standard service tier, not an
-account-selected premium mode. The reference documents output-token limiting and
+no previous response or conversation ID. Explicitly send `service_tier="default"`;
+omission/`auto` can inherit project configuration. Verify the actual outbound
+field in mocked transport and inspect the returned processing tier. A missing or
+unexpected tier stops the campaign and leaves cost unresolved until reconciled;
+do not assume the standard rate. Retain the price-change stop rule. The reference documents output-token limiting and
 storage controls; their exact SDK-version behavior still needs mock verification.
 [Responses reference](https://developers.openai.com/api/reference/python/resources/responses/methods/create).
 
@@ -118,8 +134,10 @@ Propose a dedicated project-scoped API key injected by the named account owner
 through a local process environment for an explicitly approved manual run, never
 committed, pasted into chat, printed, included in exceptions or exposed in normal
 PR CI. Name the owner and approve permissions/rotation before using any key.
-Current owner and account/project access are unconfirmed; do not assume Eray's
-AWS ownership also covers this provider account. Account creation is out of scope.
+Emir designated **Eray** as the OpenAI account/project/key owner on 2026-11-02.
+Eray's confirmation, actual access, permissions and rotation procedure remain
+unverified. This designation grants no credential access, account creation or
+spending permission. Do not infer provider-account access from AWS ownership.
 
 Send only reviewed synthetic subject/body and versioned instructions/schema.
 Propose `store=false`; it is not a claim of zero retention. Official documentation
@@ -145,9 +163,20 @@ failure or budget stop is evidence, not permission to rerun. Any tuning after
 held-out inspection requires a fresh jointly reviewed held-out set. Before that
 run, confirm neither contributor used the held-out labels for prompt tuning.
 
+Report system-level metrics over all 16 held-out cases and separately report the
+provider-eligible slice. The current frozen corpus has two local missing-opening
+shortcuts, `insufficient_context-11` and `insufficient_context-12`: at most 14
+cases exercise the model. Include dispatch counts and source tags; never call the
+16-case denominator a count of model calls or credit local shortcut abstentions
+to model-only abstention performance. Preflight-blocked and provider-error cases
+remain in their declared denominators. Acceptance still requires no unknown usage
+and the agreed deadline, not just sufficient quality scores. See the proposed
+[accounting/reporting design](./a1b-accounting-design.md) for the denominator rules.
+
 ## Approval checklist and next PR boundary
 
 - [ ] Both contributors accept or revise the provider/snapshot and quality gates.
+      Reopen model selection in light of the 2026-10-14 deprecation notice.
 - [ ] Account owner accepts exact request/token/spend ceilings, currency exclusions,
       credential procedure and synthetic-only data controls.
 - [ ] Exact official Python SDK version and transitive transport versions are

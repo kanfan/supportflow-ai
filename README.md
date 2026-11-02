@@ -12,7 +12,7 @@
 
 SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams. It will help support agents prepare faster, source-backed answer drafts from company documentation while keeping a human in control.
 
-> **Project status (2026-10-10):** Authentication, tenant-scoped tickets,
+> **Project status (2026-11-02):** Authentication, tenant-scoped tickets,
 > membership/RBAC, append-only audit, the agent workspace, secure document
 > upload/extraction, and R1 durable ingestion dispatch are on `main`. The final
 > [A1b PR CI run at `2bb31eb`](https://github.com/kanfan/supportflow-ai/actions/runs/37780049216)
@@ -27,8 +27,10 @@ SupportFlow AI is a learning-focused support copilot for Turkish B2B SaaS teams.
 > accepted for fake-only integration. Its [implementation slice](docs/a1b-fake-integration-review.md)
 > merged in [PR #65](https://github.com/kanfan/supportflow-ai/pull/65), adding
 > default-disabled fake-only persistence and synchronous API paths. The separate
-> [provider/evaluation proposal](docs/a1b-provider-evaluation-proposal.md) is under
-> review; real providers, paid calls and real-model quality remain unapproved.
+> [provider/evaluation proposal](docs/a1b-provider-evaluation-proposal.md) merged
+> as a proposed document only. The [accounting/reporting design](docs/a1b-accounting-design.md)
+> is the next review; model deprecation requires a renewed choice. Real providers,
+> paid calls and real-model quality remain unapproved.
 > Retrieval is not implemented. AWS Terraform and
 > deployment workflow code exist; live AWS verification remains deferred.
 
